@@ -1,4 +1,4 @@
-import DefaultChatInterface from "@/components/defaultChatInterface";
+
 import Header from "@/components/header";
 import UserChatList from "@/components/userList";
 import ChatInterface from "@/components/chatInterface";
