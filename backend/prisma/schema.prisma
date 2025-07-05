@@ -1,8 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// prisma/schema.prisma
+// Learn more: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -12,4 +9,40 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int   @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  password      String
+  avatarUrl     String
+  status        String
+  createdAt     DateTime @default(now())
+  projects      Project[]
+  createdChats  Chat[]   @relation("CreatorChats")
+  receivedChats Chat[]   @relation("ReceiverChats")
+}
+
+model Chat {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  creatorId   Int
+  receiverId  Int
+  message     String
+
+  creator     User     @relation("CreatorChats", fields: [creatorId], references: [id])
+  receiver    User     @relation("ReceiverChats", fields: [receiverId], references: [id])
+
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  link        String
+  thumailurl  String
+  createdAt   DateTime @default(now())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
 }
