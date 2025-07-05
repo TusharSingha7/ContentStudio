@@ -3,18 +3,51 @@ import closeImage from "@/assets/close.png";
 
 import { useEffect, useRef, useState } from 'react';
 import * as monaco from 'monaco-editor';
+import * as Y from 'yjs';
+import { WebsocketProvider } from 'y-websocket';
+import { MonacoBinding } from 'y-monaco';
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
+import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
+import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
+import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
+
+self.MonacoEnvironment = {
+  getWorker(_: string, label: string) {
+    switch (label) {
+      case 'json':
+        return new JsonWorker()
+      case 'css':
+      case 'scss':
+      case 'less':
+        return new CssWorker()
+      case 'html':
+      case 'handlebars':
+      case 'razor':
+        return new HtmlWorker()
+      case 'typescript':
+      case 'javascript':
+        return new TsWorker()
+      default:
+        return new EditorWorker()
+    }
+  }
+}
 
 export default function CodeEditor() {
   const editorRef = useRef<HTMLDivElement>(null);
   const monacoRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const [language, setLanguage] = useState<string>('javascript');
-  const [value, setValue] = useState<string>('// Write your code here...');
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
-  // Initialize Monaco editor once
   useEffect(() => {
-    if (editorRef.current) {
-      monacoRef.current = monaco.editor.create(editorRef.current, {
+    if(!editorRef.current) return;
+
+    const ydoc = new Y.Doc();
+    const provider = new WebsocketProvider('ws://localhost:3000', 'yjs/room:123', ydoc);
+    const yText = ydoc.getText('monaco');
+
+    monacoRef.current = monaco.editor.create(editorRef.current, {
         value : '// Write your code here...',
         language : "javascript",
         theme: 'vs-dark',
@@ -22,26 +55,29 @@ export default function CodeEditor() {
         fontSize: 14,
         minimap: { enabled: false },
         scrollBeyondLastLine: false,
-      });
+    });
 
-      // Handle content change
-      monacoRef.current.onDidChangeModelContent(() => {
-        const currentValue = monacoRef.current?.getValue() || '';
-        setValue(currentValue);
-      });
+    // Bind Yjs document to Monaco editor
+    if(monacoRef.current) {
+        const model = monacoRef.current.getModel();
+        if(model) {
+            const monacoBinding = new MonacoBinding(
+                yText,
+                model,
+                new Set([monacoRef.current]),
+                provider.awareness
+            )
+
+            return () => {
+                monacoBinding.destroy();
+                provider.disconnect();
+                ydoc.destroy();
+                monacoRef.current?.dispose();
+                monacoRef.current = null;
+            };
+        }
     }
-
-    return () => {
-      monacoRef.current?.dispose();
-      monacoRef.current = null;
-    };
   }, []);
-
-  useEffect(() => {
-    if (monacoRef.current && monacoRef.current.getValue() !== value) {
-      monacoRef.current.setValue(value);
-    }
-  }, [value]);
 
   const handleLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newLang = event.target.value;
@@ -82,6 +118,7 @@ export default function CodeEditor() {
             <option value="cpp">C++</option>
             <option value="html">HTML</option>
             <option value="css">CSS</option>
+            <option value="typescript">Typescript</option>
           </select>
           <Button className="mx-2 bg-[#393E46]" onClick={() => {/* Save handler */}}>
             Save

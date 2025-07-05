@@ -14,7 +14,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUpPage />} />
         <Route path="/" element={<Chat/>} />
-        <Route path="/editor" element={<Editor/>} />
+        <Route path="/editor/*" element={<Editor/>} />
       </Routes>
     </BrowserRouter>
     </>

@@ -8,5 +8,17 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.11.1",
+    "@y/websocket-server": "^0.1.1",
+    "express": "^5.1.0",
+    "ws": "^8.18.3",
+    "y-websocket": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/ws": "^8.18.1",
+    "prisma": "^6.11.1"
+  }
 }

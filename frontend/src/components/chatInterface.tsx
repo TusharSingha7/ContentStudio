@@ -44,12 +44,12 @@ export default function ChatInterface() {
             status: "online",
             email: ""
         })
-    },[chatList , userDetails]);
+    },[]);
 
     return <>
     <div className="flex flex-col h-full">
         <ChatTopBar props={userDetails} />
-        <div className="flex-1 border-l">
+        <div className="flex-1 border-l border-[#393E46]">
             <ChatList chatList={chatList} />
         </div>
         <ChatControls/>

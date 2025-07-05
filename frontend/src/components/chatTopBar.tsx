@@ -4,7 +4,7 @@ import profileImage from "@/assets/profile-user.png";
 
 export default function ChatTopBar({props} : {props : userDetails}) {
     return <>
-        <div className="flex h-16 bg-[#222831] text-white border-l border-b">
+        <div className="flex h-16 bg-[#222831] text-white border-l border-b border-[#393E46]">
             <div className="flex-1 w-full flex items-center p-2 hover:bg-[#393E46] rounded cursor-pointer">
                 <img src={profileImage} className="w-10 h-10" />
                 <span className="flex flex-col pl-3">

@@ -21,7 +21,7 @@ export default function UserChatList() {
             {name: "Tushar", status: "online", id: "1", email: "tusinghar@gmail.com"},
             {name: "Tushar", status: "online", id: "1", email: "tusinghar@gmail.com"},
         ])
-    },[users])
+    },[])
 
     return <>
     <div className="flex flex-col bg-[#222831] relative">
@@ -32,12 +32,12 @@ export default function UserChatList() {
             </svg>
         
             <input
-            className="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded-md pl-10 pr-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow"
+            className="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-[#393E46] rounded-md pl-10 pr-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow"
             placeholder="search users ..." 
             />
         </div>
     </div>
-    <div className="border-t my-3 px-4 border-b border-gray-400 py-2 flex items-center">
+    <div className="border-t border-[#393E46] my-3 px-4 border-b border-gray-400 py-2 flex items-center">
         <Checkbox
           className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500 
                      data-[state=checked]:text-white"
@@ -50,7 +50,7 @@ export default function UserChatList() {
         })}
     </div>
     <div className="px-4 text-gray-400 text-sm">
-        <Button className="border w-full py-2 mt-6 transition hover:bg-[#393e46] hover:text-white" variant="ghost" onClick={()=> {
+        <Button className="border border-[#393E46] w-full py-2 mt-6 transition hover:bg-[#393e46] hover:text-white" variant="ghost" onClick={()=> {
 
         }} >
             <img src={logoutImage} alt="Logout" className="w-4 h-4" />
