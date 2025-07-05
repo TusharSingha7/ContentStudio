@@ -2,28 +2,16 @@ import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
-import {
-    applyAwarenessUpdate,
-    Awareness,
-    encodeAwarenessUpdate,
-    removeAwarenessStates
-} from 'y-protocols/awareness.js';
+import { applyAwarenessUpdate , Awareness , encodeAwarenessUpdate , removeAwarenessStates } from 'y-protocols/awareness';
 // Import 'writeUpdate' which is crucial for broadcasting
-import { readSyncMessage, writeSyncStep1, writeUpdate } from 'y-protocols/sync.js';
+import { readSyncMessage, writeSyncStep1, writeUpdate } from 'y-protocols/sync';
 
-import {
-    createEncoder,
-    toUint8Array,
-    writeVarUint,
-    writeVarUint8Array,
-    length as encodingLength
-} from 'lib0/encoding.js';
+import {createEncoder,toUint8Array,writeVarUint,writeVarUint8Array,length as encodingLength} from 'lib0/encoding.js';
 import {
     createDecoder,
     readVarUint,
     readVarUint8Array
 } from 'lib0/decoding.js';
-import { PrismaClient } from '@prisma/client';
 import { userDetailsSchema , projectDetailsSchema , chatDetailsSchema } from './types';
 import jwt from 'jsonwebtoken'
 import { authMiddleware } from './middleware';
@@ -159,23 +147,47 @@ yjsWss.on('connection', (ws, req) => {
 
 
 // --- Server and other WebSocket handlers remain the same ---
+const userSet = new Set<any>();
+const socketUserMap = new Map<WebSocket,any>();
 
-const langWss = new WebSocketServer({ noServer: true });
-langWss.on('connection', (ws: WebSocket) => {
+const langWss = new WebSocketServer({ noServer: true , verifyClient: (info, done) => done(true) });
+langWss.on('connection', (ws: WebSocket , req) => {
     console.log('New client connected to /live-code');
+    ws.send(JSON.stringify({
+        code : 1,
+    }))
     ws.on('message', (message: Buffer) => {
         console.log(`Received message on /live-code: ${message.toString()}`);
         const data = JSON.parse(message.toString());
-        console.log('Parsed data:', data);
-        langWss.clients.forEach((client) => {
-            if (client !== ws && client.readyState === WebSocket.OPEN) {
-                client.send(message);
-            }
-        });
+        if(data.code == 1) {
+            //user deatils came add to live users list 
+            const userD = data.data;
+            userSet.add(userD);
+            socketUserMap.set(ws,userD);
+            langWss.clients.forEach((client) => {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify({
+                    code : 2,
+                    data : Array.from(userSet)
+                }));
+                }
+            });
+        }
+        
     });
     ws.on('close', () => {
+        userSet.delete(socketUserMap.get(ws));
+        langWss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                    code : 2,
+                    data : Array.from(userSet)
+                }));
+            }
+        });
         console.log('Client disconnected from /live-code');
     });
+    
 });
 
 server.on('upgrade', (request, socket, head) => {
@@ -211,12 +223,11 @@ app.post('/user',async (req,res) =>{
         }
     });
     const secret = process.env.JWT_SECRET || "your_jwt_secret";
-    const token = jwt.sign({ id: user.id, email: user.email }, secret);
+    const token = jwt.sign({ id: user.id, email: user.email , name : user.name }, secret);
     res.status(201).json({ message: 'User created successfully', token : token });
 })
 
 app.post('/login',async (req,res)=>{
-    const client = new PrismaClient();
     const data = req.body;
     const email = data.email;
     const password = data.password;
@@ -234,11 +245,42 @@ app.post('/login',async (req,res)=>{
     }
     //return a jwt
     const secret = process.env.JWT_SECRET || "your_jwt_secret";
-    const token = jwt.sign({ id: user.id, email: user.email }, secret);
+    const token = jwt.sign({ id: user.id, email: user.email , name: user.name}, secret);
     res.status(200).json({ message: 'Login successful', token: token });
 })
 
 app.use(authMiddleware);
+
+app.post('/project',async (req,res)=>{
+    const data = req.body;
+    const parsedProject = projectDetailsSchema.safeParse(data);
+    if(!parsedProject.success) {
+        res.status(404).json({message : "invalid project format"})
+        return;
+    }
+    await client.project.create({
+        data : {
+            title : parsedProject.data.title,
+            description : parsedProject.data.title,
+            userId : parsedProject.data.userId
+        }
+    });
+    res.status(201).json({message : "project created"});
+    return;
+});
+
+app.get('/users',async (req,res)=> {
+    const users = await client.user.findMany({
+        select : {
+            id : true,
+            email : true,
+            name : true,
+            status : true
+        }
+    });
+    res.status(200).json({users});
+    return;
+})
 
 app.get('/', (req, res) => {
     res.send('Hello—WS server up on /yjs and /live-code');
@@ -285,7 +327,12 @@ app.get('/projects',async (req,res)=>{
     res.status(200).json(projects);
 })
 
-const PORT = Number(process.env.PORT) ||  3000;
-    server.listen(PORT,'0.0.0.0', () => {
-    console.log(`Listening on http://localhost:${PORT}`);
+app.get('/verify',(req,res)=>{
+    res.status(200).json({message : "verified user"})
+    return;
+})
+
+const PORT = 3000;
+server.listen(PORT,'0.0.0.0', () => {
+console.log(`Listening on http://localhost:${PORT}`);
 });

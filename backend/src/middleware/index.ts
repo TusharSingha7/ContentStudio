@@ -28,7 +28,9 @@ const token = authHeader.split(' ')[1];
     res.status(403).json({ message: 'Invalid' });
     return; 
   } catch (error) {
-    res.status(403).json({ message: 'Invalid or expired token' });
+    res.status(403).json({ message: 'Invalid or expired token' ,
+        error , token
+     });
     return; 
   }
 }

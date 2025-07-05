@@ -3,7 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -16,7 +16,7 @@ model User {
   name          String
   email         String   @unique
   password      String
-  avatarUrl     String
+  avatarUrl     String?
   status        String
   createdAt     DateTime @default(now())
   projects      Project[]
@@ -40,8 +40,8 @@ model Project {
   id          String   @id @default(cuid())
   title       String
   description String
-  link        String
-  thumailurl  String
+  link        String?
+  thumailurl  String?
   createdAt   DateTime @default(now())
   userId      Int
   user        User     @relation(fields: [userId], references: [id])
