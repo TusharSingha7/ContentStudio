@@ -1,28 +1,49 @@
-import { useEffect, useState } from "react";
+
 import type { userDetails } from "../types";
 import UserChat from "./userChat";
 import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
 import logoutImage from "../assets/logout.png";
+import { useEffect , useRef,useState } from "react";
 
 export default function UserChatList() {
-    const [users,setUsers] = useState<userDetails[]>([]);
+    const websocket = useRef<WebSocket | null>(null);
+    const [userList,setUserList] = useState<userDetails[]>([])
 
-    useEffect(()=>{
-        setUsers([
-            {name: "Tushar", status: "online", id: "1", email: "tusinghar@gmail.com"},
-            {name: "Tushar", status: "online", id: "1", email: "tusinghar@gmail.com"},
-            {name: "Tushar", status: "online", id: "1", email: "tusinghar@gmail.com"},
-            {name: "Tushar", status: "online", id: "1", email: "tusinghar@gmail.com"},
-            {name: "Tushar", status: "online", id: "1", email: "tusinghar@gmail.com"},
-            {name: "Tushar", status: "online", id: "1", email: "tusinghar@gmail.com"},
-            {name: "Tushar", status: "online", id: "1", email: "tusinghar@gmail.com"},
-            {name: "Tushar", status: "online", id: "1", email: "tusinghar@gmail.com"},
-            {name: "Tushar", status: "online", id: "1", email: "tusinghar@gmail.com"},
-            {name: "Tushar", status: "online", id: "1", email: "tusinghar@gmail.com"},
-        ])
+    useEffect(()=> {
+        if(!websocket.current) {
+            const socket = new WebSocket('ws://localhost:3000/live-code');
+
+            socket.addEventListener('open',()=>{
+                console.log("live-code connection established");
+            })
+
+            socket.addEventListener('message',(message)=> {
+                const msg = JSON.parse(message.data);
+
+                if(msg.code == 1) {
+                    //users list came from backend
+                    const list : userDetails[] = msg.data;
+                    console.log(list);
+                    // setUserList(list);
+                }
+                else if(msg.code == 2) {
+                    //message list came from backend
+                }
+
+            })
+            socket.addEventListener('close',()=>{
+                console.log("live-code connection closed ")
+            })
+
+            socket.addEventListener('error',()=>{
+                console.log("error occured");
+            })
+
+            websocket.current = socket;
+
+        }
     },[])
-
     return <>
     <div className="flex flex-col bg-[#222831] relative">
     <div className="w-full max-w-sm min-w-full px-4 pt-4">
@@ -37,16 +58,16 @@ export default function UserChatList() {
             />
         </div>
     </div>
-    <div className="border-t border-[#393E46] my-3 px-4 border-b border-gray-400 py-2 flex items-center">
+    <div className="border border-[#393E46] my-3 px-4 py-2 flex items-center">
         <Checkbox
           className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500 
-                     data-[state=checked]:text-white"
+                     data-[state=checked]:text-white data-[state=unchecked]:border-[#393E46]"  
         />
         <span className="ml-2 text-sm text-gray-400">Show Online Users Only</span>
     </div>
     <div className="flex flex-col gap-2 px-2 overflow-y-auto h-[calc(100vh-250px)] custom-scrollbar">
-        {users.map((user)=>{
-            return <UserChat name={user.name} status={user.status} />
+        {userList.map((user)=>{
+            return <UserChat key={user.id} name={user.name} status={user.status} />
         })}
     </div>
     <div className="px-4 text-gray-400 text-sm">

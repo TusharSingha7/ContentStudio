@@ -1,44 +1,37 @@
 import CodeEditor from "@/components/codeEditor";
 import RoomUserList from "@/components/roomList";
-import type { userDetails } from "@/types";
-import { useEffect, useRef,useState } from 'react';
+import axios from "axios";
+import { useEffect } from "react";
+import { useNavigate } from "react-router";
 
 export default function Editor() {
-    const websocket = useRef<WebSocket | null>(null);
-    const [usersList, setUserList] = useState<userDetails[]>([]);
 
-    useEffect(() => {
-        if (!websocket.current) {
-            websocket.current = new WebSocket('ws://localhost:3000/live-code');
-            websocket.current.onopen = () => {
-                console.log('WebSocket connection established');
-            };
-            websocket.current.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                console.log('Message received from server:', data);
-                if(data.code == 1) {
-                    //send user details to server
+    const navigate = useNavigate();
 
+    useEffect(()=>{
+        async function check() {
+            const response = await axios.get('http://localhost:3000/verify',{
+                headers : {
+                    Authorization : `Bearer ${localStorage.getItem("token") || ""}`
                 }
-                else if(data.code == 2) {
-                    //update user list received from server
-                    console.log('User list updated:', data.users);
-                    setUserList(data.users);
-                }
-            };
-            websocket.current.onclose = () => {
-                console.log('WebSocket connection closed');
-            };
-        }
-        return () => {
-            if (websocket.current) {
-                websocket.current.close();
+            });
+            if(!response) {
+                //valid user 
+                navigate('/login')
             }
-        };
-    }, []);
+        }
+        check().then(()=>{
+            console.log("verified user")
+        }).catch((e)=>{
+            console.log("unverified user");
+            console.log(e);
+            navigate('/login')
+        })
+    },[navigate])
+    
     return <>
         <div className="min-h-screen flex">
-            <RoomUserList usersList = {usersList} />
+            <RoomUserList/>
             <CodeEditor/>
         </div>
     </>
