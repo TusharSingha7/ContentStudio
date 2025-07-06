@@ -54,7 +54,7 @@ export default function RoomUserList() {
             <ul className=" p-2">
                 {usersList.map((user)=> {
                     return <>
-                        <UserChat key={user.email} name={user.name} status="online" />
+                        <UserChat id={user.id} key={user.email} name={user.name} status="online" />
                     </>
                 })}
             </ul>

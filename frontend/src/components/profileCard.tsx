@@ -1,4 +1,4 @@
-import InputWithLabel from "./inputBox";
+
 import UserInfoCard from "./userInfo";
 
 export default function ProfileCard() {
@@ -7,9 +7,7 @@ export default function ProfileCard() {
         <div>Profile</div>
         <div>Your Profile Information</div>
         <img></img>
-        <div>click the camera icon to update your photo</div>
-        <InputWithLabel/>
-        <InputWithLabel/>   
+        <div>click the camera icon to update your photo</div> 
         <UserInfoCard/>
     </div>
     </>

@@ -4,45 +4,34 @@ import UserChat from "./userChat";
 import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
 import logoutImage from "../assets/logout.png";
-import { useEffect , useRef,useState } from "react";
+import { useEffect ,useState } from "react";
+import axios from "axios";
+import {  useSetRecoilState } from "recoil";
+import {  selectedUser } from "@/store";
+import { useNavigate } from "react-router";
 
 export default function UserChatList() {
-    const websocket = useRef<WebSocket | null>(null);
     const [userList,setUserList] = useState<userDetails[]>([])
+    const setUser = useSetRecoilState(selectedUser);
+    const navigate = useNavigate()
 
     useEffect(()=> {
-        if(!websocket.current) {
-            const socket = new WebSocket('ws://localhost:3000/live-code');
-
-            socket.addEventListener('open',()=>{
-                console.log("live-code connection established");
-            })
-
-            socket.addEventListener('message',(message)=> {
-                const msg = JSON.parse(message.data);
-
-                if(msg.code == 1) {
-                    //users list came from backend
-                    const list : userDetails[] = msg.data;
-                    console.log(list);
-                    // setUserList(list);
+        async function listFetcher() {
+            const response = await axios.get('http://localhost:3000/users',{
+                headers : {
+                    Authorization : `Bearer ${localStorage.getItem("token") || ""}`
                 }
-                else if(msg.code == 2) {
-                    //message list came from backend
-                }
-
-            })
-            socket.addEventListener('close',()=>{
-                console.log("live-code connection closed ")
-            })
-
-            socket.addEventListener('error',()=>{
-                console.log("error occured");
-            })
-
-            websocket.current = socket;
-
+            });
+            if(response) {
+                setUserList(response.data.users);
+            }
         }
+        listFetcher().then(()=>{
+            console.log("list fetched")
+        }).catch((e)=>{
+            console.log("caught error");
+            console.log(e);
+        });
     },[])
     return <>
     <div className="flex flex-col bg-[#222831] relative">
@@ -58,7 +47,7 @@ export default function UserChatList() {
             />
         </div>
     </div>
-    <div className="border border-[#393E46] my-3 px-4 py-2 flex items-center">
+    <div className="border-y border-[#393E46] my-3 px-4 py-2 flex items-center">
         <Checkbox
           className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500 
                      data-[state=checked]:text-white data-[state=unchecked]:border-[#393E46]"  
@@ -67,12 +56,17 @@ export default function UserChatList() {
     </div>
     <div className="flex flex-col gap-2 px-2 overflow-y-auto h-[calc(100vh-250px)] custom-scrollbar">
         {userList.map((user)=>{
-            return <UserChat key={user.id} name={user.name} status={user.status} />
+            return (<button className="w-full inline-block" key={user.id} onClick={()=>{
+                    setUser(user);
+                }}>
+                    <UserChat id={user.id} name={user.name} status={user.status} />
+                </button>)
         })}
     </div>
     <div className="px-4 text-gray-400 text-sm">
-        <Button className="border border-[#393E46] w-full py-2 mt-6 transition hover:bg-[#393e46] hover:text-white" variant="ghost" onClick={()=> {
-
+        <Button className="hover:brightness-100 border border-[#393E46] w-full py-2 mt-6 transition hover:bg-[#393e46] hover:text-white" variant="ghost" onClick={()=> {
+            localStorage.removeItem("token");
+            navigate('/login'); 
         }} >
             <img src={logoutImage} alt="Logout" className="w-4 h-4" />
             Log Out

@@ -2,7 +2,7 @@ import chatImage from "../assets/message-code.png";
 
 export default function DefaultChatInterface() {
     return <>
-        <div className="flex flex-col items-center border-l justify-center bg-[#1d2f33]">
+        <div className="flex flex-col items-center border-l border-[#393E46] justify-center bg-[#1d2f33]">
             <img src={chatImage} alt="chatImage" className="my-4 w-24 h-24 animate-pulse bg-[#034437]/40 border border-[#034437] p-3 rounded-xl" />
             <h1 className="font-bold text-4xl text-white my-4">Welcome to CodeStudio!</h1>
             <p className="text-xl text-gray-500 my-2 w-[50%] text-center">Select a conversation from sidebar to start coding together</p>
