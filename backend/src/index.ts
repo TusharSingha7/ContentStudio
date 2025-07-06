@@ -12,7 +12,7 @@ import {
     readVarUint,
     readVarUint8Array
 } from 'lib0/decoding.js';
-import { userDetailsSchema , projectDetailsSchema , chatDetailsSchema } from './types';
+import { userDetailsSchema , projectDetailsSchema , chatDetailsSchema, ChatDetails } from './types';
 import jwt from 'jsonwebtoken'
 import { authMiddleware } from './middleware';
 import cors from 'cors'
@@ -149,6 +149,7 @@ yjsWss.on('connection', (ws, req) => {
 // --- Server and other WebSocket handlers remain the same ---
 const userSet = new Set<any>();
 const socketUserMap = new Map<WebSocket,any>();
+const userSocketMap = new Map<number,WebSocket>();
 
 const langWss = new WebSocketServer({ noServer: true , verifyClient: (info, done) => done(true) });
 langWss.on('connection', (ws: WebSocket , req) => {
@@ -156,14 +157,15 @@ langWss.on('connection', (ws: WebSocket , req) => {
     ws.send(JSON.stringify({
         code : 1,
     }))
-    ws.on('message', (message: Buffer) => {
+    ws.on('message',async  (message: Buffer) => {
         console.log(`Received message on /live-code: ${message.toString()}`);
         const data = JSON.parse(message.toString());
         if(data.code == 1) {
             //user deatils came add to live users list 
             const userD = data.data;
             userSet.add(userD);
-            socketUserMap.set(ws,userD);
+            socketUserMap.set(ws,userD.id);
+            userSocketMap.set(userD.id,ws);
             langWss.clients.forEach((client) => {
                 if (client.readyState === WebSocket.OPEN) {
                     client.send(JSON.stringify({
@@ -173,10 +175,61 @@ langWss.on('connection', (ws: WebSocket , req) => {
                 }
             });
         }
+        else if(data.code == 6) {
+            const msg = data.data;
+            const sender = msg.userDetails;
+            const receiver = msg.selectedUser;
+            const chat : ChatDetails = {
+                creatorId : sender.id,
+                receiverId : receiver.id,
+                message : msg.message
+            }
+            
+            const str = JSON.stringify(chat.message)
+            const chatR  = await client.chat.create({
+                data : {
+                    creatorId : chat.creatorId,
+                    receiverId : chat.receiverId,
+                    message : str
+                }
+            });
+            if(userSocketMap.has(receiver.id)) {
+                const socket = userSocketMap.get(receiver.id);
+                if(socket?.readyState == socket?.OPEN) {
+                    socket?.send(JSON.stringify({
+                        code : 6,
+                        data : chatR
+                    }))
+                }
+            }
+            ws.send(JSON.stringify({
+                code : 6,
+                data : chatR
+            }))
+        }
+        else if(data.code == 4) {
+            const msg = data.data;
+            const senderId = msg.userDetails.id;
+            const receiverId = msg.selectedUser.id
+            const list = await client.chat.findMany({
+                where: {
+                    OR: [
+                        { creatorId: senderId , receiverId: receiverId },
+                        { receiverId: senderId , creatorId: receiverId }
+                    ]
+                }
+            });
+            ws.send(JSON.stringify({
+                code : 4,
+                data : list
+            }))
+        }
         
     });
     ws.on('close', () => {
-        userSet.delete(socketUserMap.get(ws));
+        const userId = socketUserMap.get(ws);
+        userSet.delete(userId);
+        if(userSocketMap.has(userId)) userSocketMap.delete(userId);
         langWss.clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify({
