@@ -37,29 +37,40 @@ const docs = new Map<string, DocData>();
 // This function is now responsible for setting up the broadcast listeners
 function getYDoc(docName: string): DocData {
     if (!docs.has(docName)) {
-    const doc = new Y.Doc();
-    const awareness = new Awareness(doc);
-    const connections = new Map<WebSocket, Set<number>>();
-    
-    // When the document changes, broadcast the update to all connected clients
-    doc.on('update', (update: Uint8Array, origin: WebSocket) => {
-        const encoder = createEncoder();
-        writeVarUint(encoder, messageSync);
-        // Use writeUpdate to encode the update
-        writeUpdate(encoder, update);
-        const message = toUint8Array(encoder);
+        const doc = new Y.Doc();
+        const awareness = new Awareness(doc);
+        const connections = new Map<WebSocket, Set<number>>();
 
-        // Send the update to all connections except the origin
-        connections.forEach((_, conn) => {
-            if (conn !== origin) {
+        doc.on('update', (update: Uint8Array, origin: any) => {
+            const encoder = createEncoder();
+            writeVarUint(encoder, messageSync);
+            writeUpdate(encoder, update);
+            const message = toUint8Array(encoder);
+
+            connections.forEach((_, conn) => {
+                // Send to everyone except the originator
+                if (conn !== origin) {
+                    conn.send(message);
+                }
+            });
+        });
+        
+        // This listener is now created only ONCE per document.
+        awareness.on('update', ({ added, updated, removed }: { added: number[], updated: number[], removed: number[] }) => {
+            const changedClients = added.concat(updated, removed);
+            const encoder = createEncoder();
+            writeVarUint(encoder, messageAwareness);
+            writeVarUint8Array(encoder, encodeAwarenessUpdate(awareness, changedClients));
+            const message = toUint8Array(encoder);
+
+            connections.forEach((_, conn) => {
                 conn.send(message);
-            }
+            });
         });
-        });
+
         docs.set(docName, { doc, awareness, connections });
     }
     return docs.get(docName)!;
-    
 }
 
 const app = express();
@@ -72,11 +83,10 @@ app.use(express.json());
 yjsWss.on('connection', (ws, req) => {
     try {
         const docName = req.url?.slice(1).split('?')[0] || 'default';
-        console.log("docname" , docName);
         const { doc, awareness, connections } = getYDoc(docName);
-        
-        console.log(`Client connected to document: ${docName}`);
 
+        console.log(`Client connected to document: ${docName}`);
+        
         const clientIDs = new Set<number>();
         connections.set(ws, clientIDs);
 
@@ -86,6 +96,7 @@ yjsWss.on('connection', (ws, req) => {
 
             switch (messageType) {
                 case messageSync: {
+                    // Apply document updates from the client
                     const encoder = createEncoder();
                     writeVarUint(encoder, messageSync);
                     readSyncMessage(decoder, encoder, doc, ws);
@@ -96,48 +107,29 @@ yjsWss.on('connection', (ws, req) => {
                     break;
                 }
                 case messageAwareness: {
-                    // This correctly applies the awareness update to the central instance
+                    // Apply awareness updates from the client to the central awareness instance
                     applyAwarenessUpdate(awareness, readVarUint8Array(decoder), ws);
                     break;
                 }
             }
         });
 
-        const awarenessChangeHandler = ({ added, updated, removed }: { added: number[], updated: number[], removed: number[] }) => {
-            const changedClients = added.concat(updated, removed);
-            
-            added.forEach(clientID => clientIDs.add(clientID));
-            removed.forEach(clientID => clientIDs.delete(clientID));
-
-            const encodedUpdate = encodeAwarenessUpdate(awareness, changedClients);
-            const message = createEncoder();
-            writeVarUint(message, messageAwareness);
-            writeVarUint8Array(message, encodedUpdate);
-            const finalMessage = toUint8Array(message);
-
-            // Broadcast awareness changes to all clients
-            connections.forEach((_, conn) => {
-                conn.send(finalMessage);
-            });
-        };
-
-        awareness.on('update', awarenessChangeHandler);
-
         ws.on('close', () => {
             console.log(`Client disconnected from document: ${docName}`);
-            const statesToRemove = connections.get(ws);
-            if (statesToRemove) {
-                removeAwarenessStates(awareness, Array.from(statesToRemove), null);
-                connections.delete(ws);
+            const controlledIds = connections.get(ws);
+            connections.delete(ws);
+
+            if (controlledIds) {
+                removeAwarenessStates(awareness, Array.from(controlledIds), null);
             }
         });
-        
+        // 1. Send the current document state to the new client
         const syncEncoder = createEncoder();
         writeVarUint(syncEncoder, messageSync);
         writeSyncStep1(syncEncoder, doc);
         ws.send(toUint8Array(syncEncoder));
 
-        // Send the current awareness state to the new client
+        // 2. Send the current awareness state of all other users to the new client
         const awarenessStates = awareness.getStates();
         if (awarenessStates.size > 0) {
             const awarenessEncoder = createEncoder();
@@ -145,11 +137,9 @@ yjsWss.on('connection', (ws, req) => {
             writeVarUint8Array(awarenessEncoder, encodeAwarenessUpdate(awareness, Array.from(awarenessStates.keys())));
             ws.send(toUint8Array(awarenessEncoder));
         }
-
     }
-    catch(err) {
-        console.log(err);
-        return;
+    catch (err) {
+        console.error(err);
     }
 });
 

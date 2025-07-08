@@ -60,9 +60,9 @@ export default function RoomUserList() {
             <h1 className="text-md text-center p-7">Online Users : {usersList.length}</h1>
             <ul className=" p-2 overflow-y-auto custom-scrollbar">
                 {usersList.map((user)=> {
-                    return <>
+                    return (
                         <UserChat id={user.id} key={user.email} name={user.name} status="online" />
-                    </>
+                    )
                 })}
             </ul>
         </div>

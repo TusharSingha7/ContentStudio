@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import closeImage from "@/assets/close.png";
-
 import { useEffect, useRef, useState } from 'react';
 import * as monaco from 'monaco-editor';
 import * as Y from 'yjs';
@@ -41,19 +40,29 @@ export default function CodeEditor() {
   const monacoRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const [language, setLanguage] = useState<string>('javascript');
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
-  const {id} = useParams()
-  const baseSocketUrl = websocket_url
+  const { id } = useParams();
+  const baseSocketUrl = websocket_url;
 
   useEffect(() => {
-    if(!editorRef.current) return;
-    if(!id) return;
+    if (!editorRef.current || !id) return;
+
     const ydoc = new Y.Doc();
     const provider = new WebsocketProvider(`${baseSocketUrl}`, `yjs/${id}`, ydoc);
     const yText = ydoc.getText('monaco');
 
+    const awareness = provider.awareness;
+    const userColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
+    const userName = 'User ' + Math.floor(Math.random() * 100);
+
+    awareness.setLocalStateField('user', {
+      name: userName,
+      color: userColor,      
+      colorLight: '#EEEEEE'  
+    });
+
     monacoRef.current = monaco.editor.create(editorRef.current, {
-        value : '// Write your code here...',
-        language : "javascript",
+        value: '// Start coding...',
+        language: "javascript",
         theme: 'vs-dark',
         automaticLayout: true,
         fontSize: 14,
@@ -61,16 +70,15 @@ export default function CodeEditor() {
         scrollBeyondLastLine: false,
     });
 
-    // Bind Yjs document to Monaco editor
-    if(monacoRef.current) {
+    if (monacoRef.current) {
         const model = monacoRef.current.getModel();
-        if(model) {
+        if (model) {
             const monacoBinding = new MonacoBinding(
                 yText,
                 model,
                 new Set([monacoRef.current]),
-                provider.awareness
-            )
+                awareness 
+            );
 
             return () => {
                 monacoBinding.destroy();
@@ -81,7 +89,7 @@ export default function CodeEditor() {
             };
         }
     }
-  }, [id,baseSocketUrl]);
+  }, [id, baseSocketUrl]);
 
   const handleLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newLang = event.target.value;
@@ -102,6 +110,7 @@ export default function CodeEditor() {
 
   return (
     <div className="flex flex-col min-w-[80%] bg-[#222831] border border-[#393E46]">
+      
       <div className="flex bg-[#222831] p-4 text-white">
         <div className="flex-1">
           <div>Live Code Session</div>

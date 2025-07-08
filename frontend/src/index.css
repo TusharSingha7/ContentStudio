@@ -16,3 +16,34 @@
 .custom-scrollbar::-webkit-scrollbar-track {
   background: #e5e7eb;
 }
+
+.y-cursor {
+  position: absolute;
+  border-left: 2px solid black;
+  border-right: 2px solid black;
+  height: 100%;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.y-cursor-selection {
+  position: absolute;
+  opacity: 0.3;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.y-cursor-label {
+  position: absolute;
+  top: -1.2em;
+  left: -2px;
+  background-color: black;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: sans-serif;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+}
