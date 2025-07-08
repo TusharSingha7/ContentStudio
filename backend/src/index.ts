@@ -3,15 +3,11 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
 import { applyAwarenessUpdate , Awareness , encodeAwarenessUpdate , removeAwarenessStates } from 'y-protocols/awareness';
-// Import 'writeUpdate' which is crucial for broadcasting
+
 import { readSyncMessage, writeSyncStep1, writeUpdate } from 'y-protocols/sync';
 
 import {createEncoder,toUint8Array,writeVarUint,writeVarUint8Array,length as encodingLength} from 'lib0/encoding.js';
-import {
-    createDecoder,
-    readVarUint,
-    readVarUint8Array
-} from 'lib0/decoding.js';
+import {createDecoder,readVarUint,readVarUint8Array} from 'lib0/decoding.js';
 import { userDetailsSchema , projectDetailsSchema , chatDetailsSchema, ChatDetails } from './types';
 import jwt from 'jsonwebtoken'
 import { authMiddleware } from './middleware';
@@ -20,6 +16,15 @@ import client from './db';
 
 const messageSync = 0;
 const messageAwareness = 1;
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
+});
 
 interface DocData {
     doc: Y.Doc;
@@ -32,31 +37,29 @@ const docs = new Map<string, DocData>();
 // This function is now responsible for setting up the broadcast listeners
 function getYDoc(docName: string): DocData {
     if (!docs.has(docName)) {
-        const doc = new Y.Doc();
-        const awareness = new Awareness(doc);
-        const connections = new Map<WebSocket, Set<number>>();
-        
-        // *** FIX STARTS HERE ***
-        // When the document changes, broadcast the update to all connected clients
-        doc.on('update', (update: Uint8Array, origin: WebSocket) => {
-            const encoder = createEncoder();
-            writeVarUint(encoder, messageSync);
-            // Use writeUpdate to encode the update
-            writeUpdate(encoder, update);
-            const message = toUint8Array(encoder);
+    const doc = new Y.Doc();
+    const awareness = new Awareness(doc);
+    const connections = new Map<WebSocket, Set<number>>();
+    
+    // When the document changes, broadcast the update to all connected clients
+    doc.on('update', (update: Uint8Array, origin: WebSocket) => {
+        const encoder = createEncoder();
+        writeVarUint(encoder, messageSync);
+        // Use writeUpdate to encode the update
+        writeUpdate(encoder, update);
+        const message = toUint8Array(encoder);
 
-            // Send the update to all connections except the origin
-            connections.forEach((_, conn) => {
-                if (conn !== origin) {
-                    conn.send(message);
-                }
-            });
+        // Send the update to all connections except the origin
+        connections.forEach((_, conn) => {
+            if (conn !== origin) {
+                conn.send(message);
+            }
         });
-        // *** FIX ENDS HERE ***
-
+        });
         docs.set(docName, { doc, awareness, connections });
     }
     return docs.get(docName)!;
+    
 }
 
 const app = express();
@@ -83,8 +86,6 @@ yjsWss.on('connection', (ws, req) => {
             case messageSync: {
                 const encoder = createEncoder();
                 writeVarUint(encoder, messageSync);
-                // Pass `ws` as the origin. When `readSyncMessage` applies an update,
-                // it will trigger the `doc.on('update')` listener and correctly pass `ws` as the origin.
                 readSyncMessage(decoder, encoder, doc, ws);
 
                 if (encodingLength(encoder) > 1) {
@@ -145,35 +146,51 @@ yjsWss.on('connection', (ws, req) => {
     }
 });
 
+interface userDetails {
+    id : number,
+    email : string,
+    name : string,
+    iat : number
+}
 
-// --- Server and other WebSocket handlers remain the same ---
-const userSet = new Set<any>();
-const socketUserMap = new Map<WebSocket,any>();
+const userSet = new Set<userDetails>();
+const userRoom = new Map<number,string>();
+const roomList = new Map<string,Set<userDetails>>();
+const socketUserMap = new Map<WebSocket,userDetails>();
 const userSocketMap = new Map<number,WebSocket>();
 
 const langWss = new WebSocketServer({ noServer: true , verifyClient: (info, done) => done(true) });
 langWss.on('connection', (ws: WebSocket , req) => {
+    try{
     console.log('New client connected to /live-code');
     ws.send(JSON.stringify({
         code : 1,
     }))
     ws.on('message',async  (message: Buffer) => {
-        console.log(`Received message on /live-code: ${message.toString()}`);
+        // console.log(`Received message on /live-code: ${message.toString()}`);
         const data = JSON.parse(message.toString());
         if(data.code == 1) {
-            //user deatils came add to live users list 
-            const userD = data.data;
+            //user details came add to room and live list
+            const userD : userDetails = data.data.userDetails;
+            const roomId : string = data.data.roomId;
+            if(!roomList.has(roomId)) roomList.set(roomId,new Set<userDetails>());
+            roomList.get(roomId)?.add(userD);
+            userRoom.set(userD.id,roomId);
             userSet.add(userD);
-            socketUserMap.set(ws,userD.id);
+            socketUserMap.set(ws,userD);
             userSocketMap.set(userD.id,ws);
-            langWss.clients.forEach((client) => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify({
-                    code : 2,
-                    data : Array.from(userSet)
-                }));
+            console.log(userD);
+            const roomSet = roomList.get(roomId)!;
+            for(const value of roomSet){
+                const socket = userSocketMap.get(value.id);
+                if(socket?.readyState == socket?.OPEN) {
+                    //send the whole list 
+                    socket?.send(JSON.stringify({
+                        code : 2,
+                        data : Array.from(roomSet)
+                    }))
                 }
-            });
+            }
         }
         else if(data.code == 6) {
             const msg = data.data;
@@ -227,8 +244,17 @@ langWss.on('connection', (ws: WebSocket , req) => {
         
     });
     ws.on('close', () => {
-        const userId = socketUserMap.get(ws);
-        userSet.delete(userId);
+        const userD = socketUserMap.get(ws);
+        console.log("exiting");
+        console.log(userD);
+        if(!userD) return;
+        const userId = userD.id;
+        userSet.delete(userD);
+        const roomId = userRoom.get(userD.id);
+        if(!roomId) return;
+        if(roomList.has(roomId!)) {
+            roomList.get(roomId)?.delete(userD);
+        }
         if(userSocketMap.has(userId)) userSocketMap.delete(userId);
         langWss.clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
@@ -240,6 +266,14 @@ langWss.on('connection', (ws: WebSocket , req) => {
         });
         console.log('Client disconnected from /live-code');
     });
+
+    ws.on('error',(error)=>{
+        console.log(error);
+    })
+
+    }catch(e){
+        console.log(e);
+    }
     
 });
 
