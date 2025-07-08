@@ -11,6 +11,8 @@ import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
 import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
 import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
+import { websocket_url } from "@/config";
+import { useParams } from "react-router";
 
 self.MonacoEnvironment = {
   getWorker(_: string, label: string) {
@@ -39,12 +41,14 @@ export default function CodeEditor() {
   const monacoRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const [language, setLanguage] = useState<string>('javascript');
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const {id} = useParams()
+  const baseSocketUrl = websocket_url
 
   useEffect(() => {
     if(!editorRef.current) return;
-
+    if(!id) return;
     const ydoc = new Y.Doc();
-    const provider = new WebsocketProvider('ws://localhost:3000', 'yjs/room:123', ydoc);
+    const provider = new WebsocketProvider(`${baseSocketUrl}`, `yjs/${id}`, ydoc);
     const yText = ydoc.getText('monaco');
 
     monacoRef.current = monaco.editor.create(editorRef.current, {
@@ -77,7 +81,7 @@ export default function CodeEditor() {
             };
         }
     }
-  }, []);
+  }, [id,baseSocketUrl]);
 
   const handleLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newLang = event.target.value;
@@ -102,7 +106,7 @@ export default function CodeEditor() {
         <div className="flex-1">
           <div>Live Code Session</div>
           <div className="text-sm text-gray-400">
-            Session ID: _EVYHCeM4DNOzjk_yfj5q
+            Session ID: {id}
           </div>
         </div>
         <div className="flex flex-1 justify-end items-center">

@@ -6,15 +6,39 @@ import { useEffect } from "react";
 import { useRecoilState } from "recoil";
 import { chatList, chatSocket } from "@/store";
 import { useSetRecoilState } from "recoil";
+import { api_url, websocket_url } from "@/config";
+import { useNavigate } from "react-router";
+import axios from "axios";
 
 export default function Chat() {
 
     const [socket,setChatSocket] = useRecoilState(chatSocket);
     const setChatList = useSetRecoilState(chatList);
+    const baseSocketUrl = websocket_url;
+    const baseApiUrl = api_url;
+    const navigate = useNavigate();
 
     useEffect(()=>{
+        async function check() {
+            const response = await axios.get(`${baseApiUrl}/verify`,{
+                headers : {
+                    Authorization : `Bearer ${localStorage.getItem("token") || ""}`
+                }
+            });
+            if(!response) {
+                //valid user 
+                navigate('/login')
+            }
+        }
+        check().then(()=>{
+            console.log("verified user")
+        }).catch((e)=>{
+            console.log("unverified user");
+            console.log(e);
+            navigate('/login')
+        })
         if(!socket) {
-            const newsocket = new WebSocket('ws://localhost:3000/live-code');
+            const newsocket = new WebSocket(`${baseSocketUrl}/live-code`);
 
             setChatSocket(newsocket)
             
@@ -44,13 +68,14 @@ export default function Chat() {
             })
 
             return ()=>{
-                if(newsocket)  {
-                    newsocket.close()
+                if (newsocket && newsocket.readyState === WebSocket.OPEN) {
+                    newsocket.close();
+                    console.log("chat socket cleaned up");
                 }
             }
 
         }
-    },[setChatSocket,socket,setChatList])
+    },[setChatSocket,socket,setChatList,baseSocketUrl,navigate,baseApiUrl])
 
     return (
         <div className="min-h-screen flex flex-col">

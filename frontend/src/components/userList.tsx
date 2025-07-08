@@ -9,15 +9,17 @@ import axios from "axios";
 import {  useSetRecoilState } from "recoil";
 import {  selectedUser } from "@/store";
 import { useNavigate } from "react-router";
+import { api_url } from "@/config";
 
 export default function UserChatList() {
     const [userList,setUserList] = useState<userDetails[]>([])
     const setUser = useSetRecoilState(selectedUser);
     const navigate = useNavigate()
+    const baseApiUrl = api_url
 
     useEffect(()=> {
         async function listFetcher() {
-            const response = await axios.get('http://localhost:3000/users',{
+            const response = await axios.get(`${baseApiUrl}/users`,{
                 headers : {
                     Authorization : `Bearer ${localStorage.getItem("token") || ""}`
                 }
@@ -32,7 +34,7 @@ export default function UserChatList() {
             console.log("caught error");
             console.log(e);
         });
-    },[])
+    },[baseApiUrl])
     return <>
     <div className="flex flex-col bg-[#222831] relative">
     <div className="w-full max-w-sm min-w-full px-4 pt-4">

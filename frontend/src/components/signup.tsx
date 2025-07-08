@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import chatImage from "@/assets/message-code.png";
 import { useState } from "react";
 import axios from 'axios'
+import { api_url } from "@/config";
 
 export default function SignUp() {
 
@@ -11,6 +12,7 @@ export default function SignUp() {
     const [email,setEmail] = useState<string>("");
     const [pass , setPass] = useState<string>("");
     const navigate = useNavigate();
+    const baseApiUrl = api_url
 
     return <>
     <div className="flex flex-col items-center justify-center h-full bg-[#222831] text-white">
@@ -66,7 +68,7 @@ export default function SignUp() {
         </div>
         <Button onClick={async ()=>{
             try {
-                const response = await axios.post('http://localhost:3000/user',{
+                const response = await axios.post(`${baseApiUrl}/user`,{
                     name : name,
                     email : email,
                     password : pass

@@ -45,7 +45,7 @@ function BubbleCompo({message} : {
                 <p className="text-sm font-normal py-2.5 text-gray-900 dark:text-white"> {
                     type == 0 ? (
                         <Button className="border border-gray-900 bg-[#0A400C]" onClick={()=>{
-                            navigate(`/editor/sessionId?${content}`)
+                            navigate(`/editor/${content}`)
                         }} >
                             Join Editor
                         </Button>
