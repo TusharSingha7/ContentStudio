@@ -1,5 +1,5 @@
 
-import { NextFunction, Request, Response } from "express"
+import { ErrorRequestHandler, NextFunction, Request, Response } from "express"
 import jwt from 'jsonwebtoken'
 
 interface AuthenticatedRequest extends Request {
@@ -12,8 +12,8 @@ const secret = process.env.JWT_SECRET || 'your_secret';
 const authHeader = req.headers.authorization;
 
 if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ message: 'Authorization token missing or malformed' });
-    return;
+  res.status(401).json({ message: 'Authorization token missing or malformed' });
+  return;
 }
 
 const token = authHeader.split(' ')[1];
@@ -33,4 +33,16 @@ const token = authHeader.split(' ')[1];
      });
     return; 
   }
+}
+
+export const errorHandler : ErrorRequestHandler = (err, req : Request, res : Response, next : NextFunction) => {
+  console.error(err); 
+  const statusCode = 500;
+  const message = err.message || "Internal Server Error";
+  res.status(statusCode).json({
+    success: false,
+    error: message,
+  });
+
+  return;
 }

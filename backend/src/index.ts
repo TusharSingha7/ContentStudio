@@ -10,7 +10,7 @@ import {createEncoder,toUint8Array,writeVarUint,writeVarUint8Array,length as enc
 import {createDecoder,readVarUint,readVarUint8Array} from 'lib0/decoding.js';
 import { userDetailsSchema , projectDetailsSchema , chatDetailsSchema, ChatDetails } from './types';
 import jwt from 'jsonwebtoken'
-import { authMiddleware } from './middleware';
+import { authMiddleware, errorHandler } from './middleware';
 import cors from 'cors'
 import client from './db';
 
@@ -70,79 +70,86 @@ app.use(cors());
 app.use(express.json());
 
 yjsWss.on('connection', (ws, req) => {
-    const docName = req.url?.slice(1).split('?')[0] || 'default';
-    const { doc, awareness, connections } = getYDoc(docName);
-    
-    console.log(`Client connected to document: ${docName}`);
-
-    const clientIDs = new Set<number>();
-    connections.set(ws, clientIDs);
-
-    ws.on('message', (message: Buffer) => {
-        const decoder = createDecoder(message);
-        const messageType = readVarUint(decoder);
-
-        switch (messageType) {
-            case messageSync: {
-                const encoder = createEncoder();
-                writeVarUint(encoder, messageSync);
-                readSyncMessage(decoder, encoder, doc, ws);
-
-                if (encodingLength(encoder) > 1) {
-                    ws.send(toUint8Array(encoder));
-                }
-                break;
-            }
-            case messageAwareness: {
-                // This correctly applies the awareness update to the central instance
-                applyAwarenessUpdate(awareness, readVarUint8Array(decoder), ws);
-                break;
-            }
-        }
-    });
-
-    const awarenessChangeHandler = ({ added, updated, removed }: { added: number[], updated: number[], removed: number[] }) => {
-        const changedClients = added.concat(updated, removed);
+    try {
+        const docName = req.url?.slice(1).split('?')[0] || 'default';
+        console.log("docname" , docName);
+        const { doc, awareness, connections } = getYDoc(docName);
         
-        added.forEach(clientID => clientIDs.add(clientID));
-        removed.forEach(clientID => clientIDs.delete(clientID));
+        console.log(`Client connected to document: ${docName}`);
 
-        const encodedUpdate = encodeAwarenessUpdate(awareness, changedClients);
-        const message = createEncoder();
-        writeVarUint(message, messageAwareness);
-        writeVarUint8Array(message, encodedUpdate);
-        const finalMessage = toUint8Array(message);
+        const clientIDs = new Set<number>();
+        connections.set(ws, clientIDs);
 
-        // Broadcast awareness changes to all clients
-        connections.forEach((_, conn) => {
-            conn.send(finalMessage);
+        ws.on('message', (message: Buffer) => {
+            const decoder = createDecoder(message);
+            const messageType = readVarUint(decoder);
+
+            switch (messageType) {
+                case messageSync: {
+                    const encoder = createEncoder();
+                    writeVarUint(encoder, messageSync);
+                    readSyncMessage(decoder, encoder, doc, ws);
+
+                    if (encodingLength(encoder) > 1) {
+                        ws.send(toUint8Array(encoder));
+                    }
+                    break;
+                }
+                case messageAwareness: {
+                    // This correctly applies the awareness update to the central instance
+                    applyAwarenessUpdate(awareness, readVarUint8Array(decoder), ws);
+                    break;
+                }
+            }
         });
-    };
 
-    awareness.on('update', awarenessChangeHandler);
+        const awarenessChangeHandler = ({ added, updated, removed }: { added: number[], updated: number[], removed: number[] }) => {
+            const changedClients = added.concat(updated, removed);
+            
+            added.forEach(clientID => clientIDs.add(clientID));
+            removed.forEach(clientID => clientIDs.delete(clientID));
 
-    ws.on('close', () => {
-        console.log(`Client disconnected from document: ${docName}`);
-        const statesToRemove = connections.get(ws);
-        if (statesToRemove) {
-            removeAwarenessStates(awareness, Array.from(statesToRemove), null);
-            connections.delete(ws);
+            const encodedUpdate = encodeAwarenessUpdate(awareness, changedClients);
+            const message = createEncoder();
+            writeVarUint(message, messageAwareness);
+            writeVarUint8Array(message, encodedUpdate);
+            const finalMessage = toUint8Array(message);
+
+            // Broadcast awareness changes to all clients
+            connections.forEach((_, conn) => {
+                conn.send(finalMessage);
+            });
+        };
+
+        awareness.on('update', awarenessChangeHandler);
+
+        ws.on('close', () => {
+            console.log(`Client disconnected from document: ${docName}`);
+            const statesToRemove = connections.get(ws);
+            if (statesToRemove) {
+                removeAwarenessStates(awareness, Array.from(statesToRemove), null);
+                connections.delete(ws);
+            }
+        });
+        
+        const syncEncoder = createEncoder();
+        writeVarUint(syncEncoder, messageSync);
+        writeSyncStep1(syncEncoder, doc);
+        ws.send(toUint8Array(syncEncoder));
+
+        // Send the current awareness state to the new client
+        const awarenessStates = awareness.getStates();
+        if (awarenessStates.size > 0) {
+            const awarenessEncoder = createEncoder();
+            writeVarUint(awarenessEncoder, messageAwareness);
+            writeVarUint8Array(awarenessEncoder, encodeAwarenessUpdate(awareness, Array.from(awarenessStates.keys())));
+            ws.send(toUint8Array(awarenessEncoder));
         }
-    });
-    
-    // --- Initial Sync Handshake ---
-    const syncEncoder = createEncoder();
-    writeVarUint(syncEncoder, messageSync);
-    writeSyncStep1(syncEncoder, doc);
-    ws.send(toUint8Array(syncEncoder));
 
-    // Send the current awareness state to the new client
-    const awarenessStates = awareness.getStates();
-    if (awarenessStates.size > 0) {
-        const awarenessEncoder = createEncoder();
-        writeVarUint(awarenessEncoder, messageAwareness);
-        writeVarUint8Array(awarenessEncoder, encodeAwarenessUpdate(awareness, Array.from(awarenessStates.keys())));
-        ws.send(toUint8Array(awarenessEncoder));
+    }
+    catch(err) {
+        console.log(err);
+        return;
     }
 });
 
@@ -278,17 +285,22 @@ langWss.on('connection', (ws: WebSocket , req) => {
 });
 
 server.on('upgrade', (request, socket, head) => {
-    const pathname = request.url;
-    if (pathname?.startsWith('/yjs')) {
-        yjsWss.handleUpgrade(request, socket, head, (ws) => {
-            yjsWss.emit('connection', ws, request);
-        });
-    } else if (pathname?.startsWith('/live-code')) {
-        langWss.handleUpgrade(request, socket, head, (ws) => {
-            langWss.emit('connection', ws, request);
-        });
-    } else {
-        socket.destroy();
+    try {
+        const pathname = request.url;
+        if (pathname?.startsWith('/yjs')) {
+            yjsWss.handleUpgrade(request, socket, head, (ws) => {
+                yjsWss.emit('connection', ws, request);
+            });
+        } else if (pathname?.startsWith('/live-code')) {
+            langWss.handleUpgrade(request, socket, head, (ws) => {
+                langWss.emit('connection', ws, request);
+            });
+        } else {
+            socket.destroy();
+    }
+    }catch(err){
+        console.log(err);
+        return;
     }
 });
 
@@ -418,6 +430,8 @@ app.get('/verify',(req,res)=>{
     res.status(200).json({message : "verified user"})
     return;
 })
+
+app.use(errorHandler);
 
 const PORT = 3000;
 server.listen(PORT,'0.0.0.0', () => {
