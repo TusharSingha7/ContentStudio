@@ -1,81 +1,78 @@
-
 import Header from "@/components/header";
 import UserChatList from "@/components/userList";
 import ChatInterface from "@/components/chatInterface";
 import { useEffect } from "react";
-import { useRecoilState } from "recoil";
+import { useRecoilState, useSetRecoilState } from "recoil";
 import { chatList, chatSocket } from "@/store";
-import { useSetRecoilState } from "recoil";
 import { api_url, websocket_url } from "@/config";
 import { useNavigate } from "react-router";
 import axios from "axios";
 
 export default function Chat() {
-
-    const [socket,setChatSocket] = useRecoilState(chatSocket);
+    const [socket, setChatSocket] = useRecoilState(chatSocket);
     const setChatList = useSetRecoilState(chatList);
     const baseSocketUrl = websocket_url;
     const baseApiUrl = api_url;
     const navigate = useNavigate();
 
-    useEffect(()=>{
-        async function check() {
-            const response = await axios.get(`${baseApiUrl}/verify`,{
-                headers : {
-                    Authorization : `Bearer ${localStorage.getItem("token") || ""}`
+    useEffect(() => {
+        if (!localStorage.getItem("token")) {
+            navigate('/login');
+            return; // Stop the effect here
+        }
+
+        async function verifyAndConnect() {
+            try {
+                await axios.get(`${baseApiUrl}/verify`, {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token")}`
+                    }
+                });
+
+                console.log("User verified successfully.");
+
+                if (!socket) {
+                    const newSocket = new WebSocket(`${baseSocketUrl}/live-code`);
+                    setChatSocket(newSocket);
+
+                    newSocket.onopen = () => {
+                        console.log("Chat socket connection established");
+                    };
+
+                    newSocket.onmessage = (message) => {
+                        const msg = JSON.parse(message.data);
+                        console.log(message);
+                        if (msg.code === 4) {
+                            setChatList(msg.data);
+                        } else if (msg.code === 6) {
+                            console.log(msg.data);
+                            setChatList((oldList) => [...oldList, msg.data]);
+                        }
+                    };
+
+                    newSocket.onclose = () => {
+                        console.log("Chat websocket closed");
+                    };
+
+                    newSocket.onerror = (e) => {
+                        console.log("Chat socket error", e);
+                    };
                 }
-            });
-            if(!response) {
-                //valid user 
-                navigate('/login')
+            } catch (error) {
+                console.log("User is unverified. Redirecting to login.", error);
+                navigate('/login');
             }
         }
-        check().then(()=>{
-            console.log("verified user")
-        }).catch((e)=>{
-            console.log("unverified user");
-            console.log(e);
-            navigate('/login')
-        })
-        if(!socket) {
-            const newsocket = new WebSocket(`${baseSocketUrl}/live-code`);
 
-            setChatSocket(newsocket)
-            
-            newsocket.addEventListener('open',()=>{
-                console.log("chat socket connection estabished");
-            });
-            newsocket.onmessage = (message)=> {
-                const msg = JSON.parse(message.data)
-                console.log(message);
-                if(msg.code == 4) {
-                    //message list recieved render
-                    setChatList(msg.data);
-                }
-                else if(msg.code == 6) {
-                    console.log(msg.data)
-                    setChatList((oldList)=>[...oldList,msg.data]);
-                }
+        verifyAndConnect();
+
+        return () => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.close();
+                console.log("Chat socket cleaned up");
             }
-
-            newsocket.addEventListener('close',()=>{
-                console.log("chat websocket closed");
-            })
-
-            newsocket.addEventListener('error',(e)=>{
-                console.log("chat socket error")
-                console.log(e);
-            })
-
-            return ()=>{
-                if (newsocket && newsocket.readyState === WebSocket.OPEN) {
-                    newsocket.close();
-                    console.log("chat socket cleaned up");
-                }
-            }
-
-        }
-    },[setChatSocket,socket,setChatList,baseSocketUrl,navigate,baseApiUrl])
+        };
+    }, [socket, setChatSocket, setChatList, baseSocketUrl, baseApiUrl, navigate]);
 
     return (
         <div className="min-h-screen flex flex-col">

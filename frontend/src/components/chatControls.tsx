@@ -8,9 +8,8 @@ import { chatSocket, selectedUser } from "@/store";
 import { useRecoilValue } from "recoil";
 import { v4 as uuidv4 } from 'uuid';
 
-
 export default function ChatControls({decode} : {
-    decode : JwtPayload
+    decode : JwtPayload | null
 }) {
     const socket = useRecoilValue(chatSocket)
     const [text,setText] = useState<string>("");
@@ -18,7 +17,7 @@ export default function ChatControls({decode} : {
 
     const handleSend = ()=> {
         console.log("clicked")
-        if(text.length > 0 && socket) {
+        if(text.length > 0 && socket && decode) {
             socket.send(JSON.stringify({
                 code : 6,
                 data : {
@@ -39,7 +38,7 @@ export default function ChatControls({decode} : {
             <img src={imageImage} className="h-5 w-5 hover:cursor-pointer " />
             <img src={codeImage} className="h-5 w-5 hover:cursor-pointer" onClick={()=>{
                 const sessionId = uuidv4()
-                if(socket) {
+                if(socket && decode) {
                     socket.send(JSON.stringify({
                         code : 6,
                         data : {

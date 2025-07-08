@@ -2,41 +2,55 @@ import ChatTopBar from "./chatTopBar";
 import ChatControls from "./chatControls";
 import ChatList from "./chatList";
 import { useRecoilValue } from "recoil";
-import {  chatSocket, selectedUser } from "@/store";
+import { chatSocket, selectedUser } from "@/store";
 import DefaultChatInterface from "./defaultChatInterface";
-import {  useEffect} from "react";
-import { jwtDecode } from "jwt-decode";
+import { useEffect, useState } from "react"; 
+import { jwtDecode, type JwtPayload } from "jwt-decode";
 
 export default function ChatInterface() {
     const socket = useRecoilValue(chatSocket);
     const user = useRecoilValue(selectedUser);
-    const token = localStorage.getItem("token") || "";
-    const decode = jwtDecode(token);
+    const [decodedToken, setDecodedToken] = useState<JwtPayload | null>(null);
 
-    useEffect(()=> {
-        if(socket && socket.readyState == socket.OPEN) {
-            
-            socket.send(JSON.stringify({
-                code:4,
-                data : {
-                    userDetails : decode,
-                    selectedUser : user
-                }
-            }))
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            try {
+                const decoded = jwtDecode(token);
+                setDecodedToken(decoded);
+            } catch (error) {
+                console.error("Failed to decode JWT:", error);
+                setDecodedToken(null); 
+            }
         }
-    },[socket,decode,user])
-    return (<>
-        {user.id === 0 ? (
-            <DefaultChatInterface />
-        ) : (
-            <div className="flex flex-col h-full">
-            <ChatTopBar />
-            <div className="flex-1 border-l border-[#393E46]">
-                <ChatList />
-            </div>
-            <ChatControls decode={decode} />
-            </div>
-        )}
+    }, []);
+
+    useEffect(() => {
+        if (socket && socket.readyState === socket.OPEN && decodedToken) {
+            socket.send(JSON.stringify({
+                code: 4,
+                data: {
+                    userDetails: decodedToken,
+                    selectedUser: user
+                }
+            }));
+        }
+    }, [socket, user, decodedToken]);
+
+    return (
+        <>
+            {user.id === 0 ? (
+                <DefaultChatInterface />
+            ) : (
+                <div className="flex flex-col h-full">
+                    <ChatTopBar />
+                    <div className="flex-1 border-l border-[#393E46]">
+                        <ChatList />
+                    </div>
+                    {/* Pass the decoded token safely */}
+                    <ChatControls decode={decodedToken} />
+                </div>
+            )}
         </>
     );
-    }
+}
