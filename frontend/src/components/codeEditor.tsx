@@ -10,7 +10,7 @@ import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
 import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
 import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
-import { websocket_url } from "@/config";
+import { websocketyjs_url } from "@/config";
 import { useParams } from "react-router";
 
 self.MonacoEnvironment = {
@@ -41,7 +41,7 @@ export default function CodeEditor() {
   const [language, setLanguage] = useState<string>('javascript');
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const { id } = useParams();
-  const baseSocketUrl = websocket_url;
+  const baseSocketUrl = websocketyjs_url;
 
   useEffect(() => {
     if (!editorRef.current || !id) return;
@@ -49,24 +49,14 @@ export default function CodeEditor() {
     const ydoc = new Y.Doc();
     const provider = new WebsocketProvider(`${baseSocketUrl}`, `yjs/${id}`, ydoc);
     const yText = ydoc.getText('monaco');
-
-    const awareness = provider.awareness;
-    const userColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
-    const userName = 'User ' + Math.floor(Math.random() * 100);
-
-    awareness.setLocalStateField('user', {
-      name: userName,
-      color: userColor,      
-      colorLight: '#EEEEEE'  
-    });
-
+  
     monacoRef.current = monaco.editor.create(editorRef.current, {
         value: '// Start coding...',
         language: "javascript",
         theme: 'vs-dark',
         automaticLayout: true,
         fontSize: 14,
-        minimap: { enabled: false },
+        minimap: { enabled: true },
         scrollBeyondLastLine: false,
     });
 
@@ -76,10 +66,8 @@ export default function CodeEditor() {
             const monacoBinding = new MonacoBinding(
                 yText,
                 model,
-                new Set([monacoRef.current]),
-                awareness 
+                new Set([monacoRef.current])
             );
-
             return () => {
                 monacoBinding.destroy();
                 provider.disconnect();
@@ -89,7 +77,7 @@ export default function CodeEditor() {
             };
         }
     }
-  }, [id, baseSocketUrl]);
+  }, [id, baseSocketUrl, monacoRef , editorRef]);
 
   const handleLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newLang = event.target.value;
@@ -133,9 +121,10 @@ export default function CodeEditor() {
             <option value="css">CSS</option>
             <option value="typescript">Typescript</option>
           </select>
-          <Button className="mx-2 bg-[#393E46]" onClick={() => {/* Save handler */}}>
-            Save
-          </Button>
+          {/* <Button className="mx-2 bg-[#393E46]" onClick={() => {/* Save handler */}
+            {/* Save */}
+          {/* </Button>  */}
+          {/* */} 
           <Button className="mx-2 bg-[#393E46]" onClick={toggleTheme}>
             {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </Button>

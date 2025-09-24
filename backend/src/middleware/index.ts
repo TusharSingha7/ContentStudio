@@ -35,14 +35,26 @@ const token = authHeader.split(' ')[1];
   }
 }
 
-export const errorHandler : ErrorRequestHandler = (err, req : Request, res : Response, next : NextFunction) => {
+export const errorHandler : ErrorRequestHandler = (err : unknown, req : Request, res : Response, next : NextFunction) => {
   console.error(err); 
   const statusCode = 500;
-  const message = err.message || "Internal Server Error";
-  res.status(statusCode).json({
-    success: false,
-    error: message,
-  });
+  if(err instanceof Error) {
+    const message = err.message || "Internal Server Error";
+
+    res.status(statusCode).json({
+      success: false,
+      error: message,
+    });
+
+  }
+  else {
+
+    res.status(statusCode).json({
+      success: false,
+      error: "unknown error",
+    });
+
+  }
 
   return;
 }

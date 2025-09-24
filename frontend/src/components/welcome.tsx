@@ -5,7 +5,7 @@ export default function Welcome({title , description} : {
     description: string;
 }) {
     return (<>
-    <div className="flex flex-col items-center justify-center h-full bg-gradient-to-r from-emerald-900 to-slate-900">
+    <div className="flex flex-col items-center justify-center h-full bg-gradient-to-r from-emerald-900 to-slate-900 hidden md:flex ">
         <div className="text-green-500 font-bold text-4xl">{title}</div>
         <div className="text-sm text-gray-400 text-center p-4" >{description} </div>
         <img src={codingImage} className="h-32 w-32" />

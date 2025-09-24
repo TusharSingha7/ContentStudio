@@ -30,6 +30,7 @@ model Chat {
   creatorId   Int
   receiverId  Int
   message     String
+  seen        Boolean?  @default(false)
 
   creator     User     @relation("CreatorChats", fields: [creatorId], references: [id])
   receiver    User     @relation("ReceiverChats", fields: [receiverId], references: [id])
@@ -45,4 +46,10 @@ model Project {
   createdAt   DateTime @default(now())
   userId      Int
   user        User     @relation(fields: [userId], references: [id])
+}
+
+model ActiveUser {
+  id            String  @id @default(cuid())
+  masterUserId  String
+  targetUserId  String
 }

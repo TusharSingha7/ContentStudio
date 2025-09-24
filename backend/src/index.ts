@@ -1,21 +1,18 @@
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import * as Y from 'yjs';
-import { applyAwarenessUpdate , Awareness , encodeAwarenessUpdate , removeAwarenessStates } from 'y-protocols/awareness';
+import { createYjsServer } from 'yjs-server';
 
-import { readSyncMessage, writeSyncStep1, writeUpdate } from 'y-protocols/sync';
-
-import {createEncoder,toUint8Array,writeVarUint,writeVarUint8Array,length as encodingLength} from 'lib0/encoding.js';
-import {createDecoder,readVarUint,readVarUint8Array} from 'lib0/decoding.js';
-import { userDetailsSchema , projectDetailsSchema , chatDetailsSchema, ChatDetails } from './types';
+import { userDetailsSchema , projectDetailsSchema , chatDetailsSchema } from './types/types';
 import jwt from 'jsonwebtoken'
 import { authMiddleware, errorHandler } from './middleware';
 import cors from 'cors'
 import client from './db';
+import { chatListRequestCode, liveChatRequestCode , socketUserMap, userDetailsAddCode, userDetailsRequestCode } from './utils/configs';
+import { chatHandler, userAddHandler, userExitHandler, chatListHandler } from './utils/wss';
 
-const messageSync = 0;
-const messageAwareness = 1;
+import { userDetailsMap , docsMap } from './utils/configs'
+import { addUserToDoc, removeUserFromDoc } from './utils/ywss';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -26,252 +23,93 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-interface DocData {
-    doc: Y.Doc;
-    awareness: Awareness;
-    connections: Map<WebSocket, Set<number>>;
-}
-
-const docs = new Map<string, DocData>();
-
-// This function is now responsible for setting up the broadcast listeners
-function getYDoc(docName: string): DocData {
-    if (!docs.has(docName)) {
-        const doc = new Y.Doc();
-        const awareness = new Awareness(doc);
-        const connections = new Map<WebSocket, Set<number>>();
-
-        doc.on('update', (update: Uint8Array, origin: any) => {
-            const encoder = createEncoder();
-            writeVarUint(encoder, messageSync);
-            writeUpdate(encoder, update);
-            const message = toUint8Array(encoder);
-
-            connections.forEach((_, conn) => {
-                // Send to everyone except the originator
-                if (conn !== origin) {
-                    conn.send(message);
-                }
-            });
-        });
-        
-        // This listener is now created only ONCE per document.
-        awareness.on('update', ({ added, updated, removed }: { added: number[], updated: number[], removed: number[] }) => {
-            const changedClients = added.concat(updated, removed);
-            const encoder = createEncoder();
-            writeVarUint(encoder, messageAwareness);
-            writeVarUint8Array(encoder, encodeAwarenessUpdate(awareness, changedClients));
-            const message = toUint8Array(encoder);
-
-            connections.forEach((_, conn) => {
-                conn.send(message);
-            });
-        });
-
-        docs.set(docName, { doc, awareness, connections });
-    }
-    return docs.get(docName)!;
-}
-
 const app = express();
+// creaitng a http server 
 const server = createServer(app);
-const yjsWss = new WebSocketServer({ noServer: true });
+// creating a yjs web socket server
 
 app.use(cors());
 app.use(express.json());
 
-yjsWss.on('connection', (ws, req) => {
-    try {
-        const docName = req.url?.slice(1).split('?')[0] || 'default';
-        const { doc, awareness, connections } = getYDoc(docName);
+const yjsWss = new WebSocketServer({ noServer: true});
 
-        console.log(`Client connected to document: ${docName}`);
-        
-        const clientIDs = new Set<number>();
-        connections.set(ws, clientIDs);
+yjsWss.on('connection',(ws:WebSocket , req)=> {
 
-        ws.on('message', (message: Buffer) => {
-            const decoder = createDecoder(message);
-            const messageType = readVarUint(decoder);
+    const roomId = req.url?.slice(1).split("?")[0] || "default";
 
-            switch (messageType) {
-                case messageSync: {
-                    // Apply document updates from the client
-                    const encoder = createEncoder();
-                    writeVarUint(encoder, messageSync);
-                    readSyncMessage(decoder, encoder, doc, ws);
+    addUserToDoc(ws , roomId);
 
-                    if (encodingLength(encoder) > 1) {
-                        ws.send(toUint8Array(encoder));
-                    }
-                    break;
-                }
-                case messageAwareness: {
-                    // Apply awareness updates from the client to the central awareness instance
-                    applyAwarenessUpdate(awareness, readVarUint8Array(decoder), ws);
-                    break;
-                }
-            }
-        });
-
-        ws.on('close', () => {
-            console.log(`Client disconnected from document: ${docName}`);
-            const controlledIds = connections.get(ws);
-            connections.delete(ws);
-
-            if (controlledIds) {
-                removeAwarenessStates(awareness, Array.from(controlledIds), null);
-            }
-        });
-        // 1. Send the current document state to the new client
-        const syncEncoder = createEncoder();
-        writeVarUint(syncEncoder, messageSync);
-        writeSyncStep1(syncEncoder, doc);
-        ws.send(toUint8Array(syncEncoder));
-
-        // 2. Send the current awareness state of all other users to the new client
-        const awarenessStates = awareness.getStates();
-        if (awarenessStates.size > 0) {
-            const awarenessEncoder = createEncoder();
-            writeVarUint(awarenessEncoder, messageAwareness);
-            writeVarUint8Array(awarenessEncoder, encodeAwarenessUpdate(awareness, Array.from(awarenessStates.keys())));
-            ws.send(toUint8Array(awarenessEncoder));
-        }
+    const doc = docsMap.get(roomId)!;
+    if(!doc) {
+        ws.close();
+        return;
     }
-    catch (err) {
-        console.error(err);
-    }
-});
 
-interface userDetails {
-    id : number,
-    email : string,
-    name : string,
-    iat : number
-}
+    const yjss = createYjsServer({
+      createDoc: () => {
+        return doc;
+      },
+    });
 
-const userSet = new Set<userDetails>();
-const userRoom = new Map<number,string>();
-const roomList = new Map<string,Set<userDetails>>();
-const socketUserMap = new Map<WebSocket,userDetails>();
-const userSocketMap = new Map<number,WebSocket>();
+    yjss.handleConnection(ws,req);
 
-const langWss = new WebSocketServer({ noServer: true , verifyClient: (info, done) => done(true) });
-langWss.on('connection', (ws: WebSocket , req) => {
+    ws.on('close',()=>{
+        removeUserFromDoc(ws,roomId);
+    })
+})
+
+const wss = new WebSocketServer({ noServer: true});
+
+wss.on('connection', (ws: WebSocket ) => {
     try{
-    console.log('New client connected to /live-code');
-    ws.send(JSON.stringify({
-        code : 1,
-    }))
-    ws.on('message',async  (message: Buffer) => {
-        // console.log(`Received message on /live-code: ${message.toString()}`);
-        const data = JSON.parse(message.toString());
-        if(data.code == 1) {
-            //user details came add to room and live list
-            const userD : userDetails = data.data.userDetails;
-            const roomId : string = data.data.roomId;
-            if(!roomList.has(roomId)) roomList.set(roomId,new Set<userDetails>());
-            roomList.get(roomId)?.add(userD);
-            userRoom.set(userD.id,roomId);
-            userSet.add(userD);
-            socketUserMap.set(ws,userD);
-            userSocketMap.set(userD.id,ws);
-            console.log(userD);
-            const roomSet = roomList.get(roomId)!;
-            for(const value of roomSet){
-                const socket = userSocketMap.get(value.id);
-                if(socket?.readyState == socket?.OPEN) {
-                    //send the whole list 
-                    socket?.send(JSON.stringify({
-                        code : 2,
-                        data : Array.from(roomSet)
-                    }))
-                }
+        const requestUserDetails = {
+            code : userDetailsRequestCode,
+            data : {
+
             }
         }
-        else if(data.code == 6) {
-            const msg = data.data;
-            const sender = msg.userDetails;
-            const receiver = msg.selectedUser;
-            const chat : ChatDetails = {
-                creatorId : sender.id,
-                receiverId : receiver.id,
-                message : msg.message
+        ws.send(JSON.stringify(requestUserDetails))
+
+        console.log("connection to normal websocket established")
+
+        ws.on('message', (message) => {
+            console.log("received message on the normal websocket");
+            console.log(message);
+            console.log(typeof(message));
+            const data = JSON.parse(message.toString());
+            console.log(data);
+            console.log("data is ");
+           
+            switch (data.code) {
+
+                case userDetailsAddCode: 
+                    userAddHandler(data , ws);
+                    break;
+                case chatListRequestCode:
+                    chatListHandler(data , ws);
+                    break;
+                case liveChatRequestCode:
+                    chatHandler(data , ws);
+                    break;
             }
             
-            const str = JSON.stringify(chat.message)
-            const chatR  = await client.chat.create({
-                data : {
-                    creatorId : chat.creatorId,
-                    receiverId : chat.receiverId,
-                    message : str
-                }
-            });
-            if(userSocketMap.has(receiver.id)) {
-                const socket = userSocketMap.get(receiver.id);
-                if(socket?.readyState == socket?.OPEN) {
-                    socket?.send(JSON.stringify({
-                        code : 6,
-                        data : chatR
-                    }))
-                }
-            }
-            ws.send(JSON.stringify({
-                code : 6,
-                data : chatR
-            }))
-        }
-        else if(data.code == 4) {
-            const msg = data.data;
-            const senderId = msg.userDetails.id;
-            const receiverId = msg.selectedUser.id
-            const list = await client.chat.findMany({
-                where: {
-                    OR: [
-                        { creatorId: senderId , receiverId: receiverId },
-                        { receiverId: senderId , creatorId: receiverId }
-                    ]
-                }
-            });
-            ws.send(JSON.stringify({
-                code : 4,
-                data : list
-            }))
-        }
-        
-    });
-    ws.on('close', () => {
-        const userD = socketUserMap.get(ws);
-        console.log("exiting");
-        console.log(userD);
-        if(!userD) return;
-        const userId = userD.id;
-        userSet.delete(userD);
-        const roomId = userRoom.get(userD.id);
-        if(!roomId) return;
-        if(roomList.has(roomId!)) {
-            roomList.get(roomId)?.delete(userD);
-        }
-        if(userSocketMap.has(userId)) userSocketMap.delete(userId);
-        langWss.clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({
-                    code : 2,
-                    data : Array.from(userSet)
-                }));
-            }
         });
-        console.log('Client disconnected from /live-code');
-    });
+        ws.on('close', (code , reason)=> {
+            const userId = socketUserMap.get(ws);
+            const userD = userDetailsMap.get(userId!);
+            console.log("connection closing " , userD)
+            userExitHandler(ws);
+        });
 
-    ws.on('error',(error)=>{
-        console.log(error);
-    })
+        ws.on('error',(error)=>{
+            console.log(error);
+        })
 
-    }catch(e){
+    }
+    catch(e){
         console.log(e);
     }
-    
+
 });
 
 server.on('upgrade', (request, socket, head) => {
@@ -279,16 +117,19 @@ server.on('upgrade', (request, socket, head) => {
         const pathname = request.url;
         if (pathname?.startsWith('/yjs')) {
             yjsWss.handleUpgrade(request, socket, head, (ws) => {
-                yjsWss.emit('connection', ws, request);
+              yjsWss.emit("connection", ws, request);
             });
-        } else if (pathname?.startsWith('/live-code')) {
-            langWss.handleUpgrade(request, socket, head, (ws) => {
-                langWss.emit('connection', ws, request);
+        }
+        else if (pathname?.startsWith('/live-code')) {
+            wss.handleUpgrade(request, socket, head, (ws) => {
+                wss.emit('connection', ws , request);
             });
-        } else {
+        } 
+        else {
             socket.destroy();
+        }
     }
-    }catch(err){
+    catch(err){
         console.log(err);
         return;
     }
@@ -402,7 +243,8 @@ app.post('/chat',async (req,res)=>{
         data: {
             creatorId: chatDetails.creatorId,
             receiverId: chatDetails.receiverId,
-            message: chatDetails.message
+            message: chatDetails.message,
+            seen: false
         }
     });
     res.status(201).json({ message: 'Chat created successfully' });
