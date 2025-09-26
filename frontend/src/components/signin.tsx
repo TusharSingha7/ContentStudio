@@ -16,7 +16,7 @@ export default function SignIn() {
     return <>
     <div className="flex flex-col items-center justify-center h-full bg-[#222831] text-white">
         <img src={chatImage} className="h-10 w-10" />
-        <div className="text-2xl font-bold p-4">Sign in to your account</div>
+        <div className="text-2xl font-bold p-4 text-center">Sign in to your account</div>
         <div className="grid w-full max-w-sm items-center gap-3">
             <div className="w-full max-w-sm min-w-[200px]">
                 <div className="relative">
@@ -36,14 +36,14 @@ export default function SignIn() {
                     <input
                     onChange={(e)=>{setPass(e.target.value)}}
                     type="password"
-                    className="text-white mb-3 border-[#393E46] peer w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow"
+                    className="text-white mb-3 border-[#393E46] peer w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow "
                     />
                     {pass === "" && <label className=" bg-[#222831] absolute cursor-text px-1 left-2.5 top-2.5 text-slate-400 text-sm transition-all transform origin-left peer-focus:-top-2 peer-focus:left-2.5 peer-focus:text-xs peer-focus:text-slate-400 peer-focus:scale-90">
                         Type Password...
                     </label>}
                     <p className="flex items-start mt-2 text-xs text-slate-400">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 mr-1.5">
-                            <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clip-rule="evenodd" />
+                            <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" />
                         </svg>
                     
                         Use at least 8 characters, one uppercase, one lowercase and one number.
@@ -64,7 +64,7 @@ export default function SignIn() {
             }catch(e) {
                 console.log(e);
             }
-        }} variant="ghost" className="bg-green-500 w-[60%] m-3 text-gray-200">Log In</Button>
+        }} variant="ghost" className="bg-green-500 m-3 text-gray-200 min-w-[200px] w-full max-w-sm" >Log In</Button>
         <div>Don't have an account? <Link to={'/signup'} className="text-green-500" >Create account</Link></div>
     </div>
     </>

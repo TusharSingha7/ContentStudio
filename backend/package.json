@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "npx tsc -b && npx prisma generate",
-    "start" : "node dist/index.js"
+    "start": "node dist/index.js"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +21,8 @@
     "jsonwebtoken": "^9.0.2",
     "ws": "^8.18.3",
     "y-websocket": "^3.0.0",
+    "y-websocket-server": "^1.0.2",
+    "yjs-server": "^0.2.3",
     "zod": "^3.25.74"
   },
   "devDependencies": {

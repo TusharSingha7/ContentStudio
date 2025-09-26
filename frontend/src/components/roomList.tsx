@@ -10,7 +10,8 @@ export default function RoomUserList() {
     const websocket = useRef<WebSocket | null>(null);
     const [usersList,setUserList] = useState<userDetails[]>([])
     const baseSocketUrl = websocket_url
-    const {id : sessionId} = useParams();
+    const pairs = useParams();
+    const sessionId = pairs.id;
 
     useEffect(()=> {
         if(!websocket.current) {
@@ -22,7 +23,9 @@ export default function RoomUserList() {
 
             socket.addEventListener('message',(message)=> {
                 const msg = JSON.parse(message.data);
-                console.log(msg)
+                console.log(msg);
+                console.log(typeof(message));
+                console.log(typeof(message.data));
                 if(msg.code == 1 && sessionId) {
                     const token = localStorage.getItem("token") || "";
                     const decoded = jwtDecode(token);
@@ -53,16 +56,29 @@ export default function RoomUserList() {
             websocket.current = socket;
 
         }
-    },[baseSocketUrl,sessionId])
+
+        return ()=> {
+            if(websocket.current) {
+                websocket.current.close();
+                websocket.current = null;
+            }
+        }
+    },[baseSocketUrl,sessionId , websocket])
 
     return <>
-        <div className="h-screen flex flex-col bg-[#222831] text-white min-w-[20%] ">
+        <div className="h-screen flex flex-col bg-[#222831] text-white min-w-[200px] w-[20%] overflow-hidden text-ellipsis">
             <h1 className="text-md text-center p-7">Online Users : {usersList.length}</h1>
-            <ul className=" p-2 overflow-y-auto custom-scrollbar">
+            <ul className=" p-2 overflow-y-auto custom-scrollbar flex-1">
                 {usersList.map((user)=> {
                     return (
-                        <UserChat id={user.id} key={user.email} name={user.name} status="online" />
-                    )
+                      <UserChat
+                        id={user.id}
+                        key={user.email}
+                        name={user.name}
+                        status="online"
+                        color="bg-[#222831]"
+                      />
+                    );
                 })}
             </ul>
         </div>
