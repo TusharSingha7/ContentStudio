@@ -6,35 +6,38 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router";
 
 export default function Editor() {
+  const navigate = useNavigate();
+  const baseApiUrl = api_url;
 
-    const navigate = useNavigate();
-    const baseApiUrl = api_url
+  useEffect(() => {
+    async function check() {
+      const response = await axios.get(`${baseApiUrl}/verify`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+        },
+      });
+      if (!response) {
+        //valid user
+        navigate("/login");
+      }
+    }
+    check()
+      .then(() => {
+        console.log("verified user");
+      })
+      .catch((e) => {
+        console.log("unverified user");
+        console.log(e);
+        navigate("/login");
+      });
+  }, [navigate, baseApiUrl]);
 
-    useEffect(()=>{
-        async function check() {
-            const response = await axios.get(`${baseApiUrl}/verify`,{
-                headers : {
-                    Authorization : `Bearer ${localStorage.getItem("token") || ""}`
-                }
-            });
-            if(!response) {
-                //valid user 
-                navigate('/login')
-            }
-        }
-        check().then(()=>{
-            console.log("verified user")
-        }).catch((e)=>{
-            console.log("unverified user");
-            console.log(e);
-            navigate('/login')
-        })
-    },[navigate,baseApiUrl])
-    
-    return <>
-        <div className="min-h-screen flex">
-            <RoomUserList/>
-            <CodeEditor/>
-        </div>
+  return (
+    <>
+      <div className="min-h-screen flex">
+        <RoomUserList />
+        <CodeEditor />
+      </div>
     </>
+  );
 }

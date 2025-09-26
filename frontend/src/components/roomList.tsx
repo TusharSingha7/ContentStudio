@@ -66,13 +66,19 @@ export default function RoomUserList() {
     },[baseSocketUrl,sessionId , websocket])
 
     return <>
-        <div className="h-screen flex flex-col bg-[#222831] text-white min-w-[20%] ">
+        <div className="h-screen flex flex-col bg-[#222831] text-white min-w-[200px] w-[20%] overflow-hidden text-ellipsis">
             <h1 className="text-md text-center p-7">Online Users : {usersList.length}</h1>
-            <ul className=" p-2 overflow-y-auto custom-scrollbar">
+            <ul className=" p-2 overflow-y-auto custom-scrollbar flex-1">
                 {usersList.map((user)=> {
                     return (
-                        <UserChat id={user.id} key={user.email} name={user.name} status="online" />
-                    )
+                      <UserChat
+                        id={user.id}
+                        key={user.email}
+                        name={user.name}
+                        status="online"
+                        color="bg-[#222831]"
+                      />
+                    );
                 })}
             </ul>
         </div>
