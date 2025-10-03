@@ -37,6 +37,25 @@ export default function ChatControls({
     setText("");
   };
 
+  const handleRoomMessageSend = () => {
+    const sessionId = uuidv4();
+    if (socket && decode) {
+      socket.send(
+        JSON.stringify({
+          code: 6,
+          data: {
+            userDetails: decode,
+            selectedUser: user,
+            message: {
+              type: 0,
+              content: sessionId,
+            },
+          },
+        })
+      );
+    }
+  };
+
   return (
     <>
       <div className="flex px-2 h-16 border-l bg-[#222831] items-center gap-2 border-[#393E46]">
@@ -44,24 +63,7 @@ export default function ChatControls({
         <img
           src={codeImage}
           className="h-5 w-5 hover:cursor-pointer"
-          onClick={() => {
-            const sessionId = uuidv4();
-            if (socket && decode) {
-              socket.send(
-                JSON.stringify({
-                  code: 6,
-                  data: {
-                    userDetails: decode,
-                    selectedUser: user,
-                    message: {
-                      type: 0,
-                      content: sessionId,
-                    },
-                  },
-                })
-              );
-            }
-          }}
+          onClick={handleRoomMessageSend}
         />
         <Input
           className="px-2 text-white border-[#393E46] focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-[#0D7500] "

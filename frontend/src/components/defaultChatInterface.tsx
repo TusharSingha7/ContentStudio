@@ -12,7 +12,7 @@ export default function DefaultChatInterface() {
         <h1 className="font-bold text-4xl text-white my-4">
           Welcome to CodeStudio!
         </h1>
-        <p className="text-xl text-gray-500 my-2 w-[50%] text-center">
+        <p className="text-xl text-green-500 my-2 w-[50%] text-center">
           Select a conversation from sidebar to start coding together
         </p>
         <div className="flex flex-col bg-[#141514] border border-[#2f302e] shadow text-white w-[50%] p-5 rounded">

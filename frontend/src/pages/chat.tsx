@@ -1,13 +1,15 @@
 import Header from "@/components/header";
 import UserChatList from "@/components/userList";
 import ChatInterface from "@/components/chatInterface";
-import { useEffect } from "react";
+import { useEffect ,useRef } from "react";
 import { api_url } from "@/config";
 import { useNavigate } from "react-router";
 import axios from "axios";
 import { useRecoilState, useSetRecoilState } from "recoil";
 import { websocket_url } from "@/config";
-import { chatSocket, chatList } from "@/store";
+import { chatSocket, chatList, selectedUser } from "@/store";
+import { useRecoilValue } from "recoil";
+import type { userDetails } from "@/types";
 
 export default function Chat() {
   const baseApiUrl = api_url;
@@ -15,7 +17,12 @@ export default function Chat() {
   const [socket, setChatSocket] = useRecoilState(chatSocket);
   const setChatList = useSetRecoilState(chatList);
   const baseSocketUrl = websocket_url;
-  // const user = useRecoilValue(selectedUser);
+  const targetUser = useRecoilValue(selectedUser);
+  const user =  useRef<userDetails>({id:0, name:"", email:"", status:"offline"});
+
+  useEffect(() => {
+    user.current = targetUser;
+  }, [targetUser])
 
   useEffect(() => {
     console.log("chat verification mounted");
@@ -66,10 +73,16 @@ export default function Chat() {
           const msg = JSON.parse(message.data);
           console.log(message);
           if (msg.code === 4) {
+            console.log("chat recieved code 4 from server")
             setChatList(msg.data);
           } else if (msg.code === 6) {
+            console.log("chat received code 6 from server")
             console.log(msg.data);
-            setChatList((oldList) => [...oldList, msg.data]);
+            console.log(user);
+            if(user.current.id == msg.data.receiverId || user.current.id == msg.data.creatorId) {
+              // i am the sender  or receiver
+              setChatList((oldChatList) => [...oldChatList, msg.data]);
+            }
           }
         };
 

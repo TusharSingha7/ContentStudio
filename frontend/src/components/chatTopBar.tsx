@@ -1,10 +1,13 @@
 import closeImage from "@/assets/close.png";
 import profileImage from "@/assets/profile-user.png";
-import { useRecoilValue } from "recoil";
+import { useRecoilState } from "recoil";
 import { selectedUser } from "@/store";
 
 export default function ChatTopBar() {
-  const user = useRecoilValue(selectedUser);
+  const [user ,setUser] = useRecoilState(selectedUser);
+  const handleClose = () => {
+    setUser({id:0, name:"", email:"", status:"offline"});
+  }
   return (
     <>
       <div className="flex h-16 bg-[#222831] text-white border-l border-b border-[#393E46]">
@@ -16,7 +19,9 @@ export default function ChatTopBar() {
           </span>
         </div>
         <div className="flex items-center p-3 rounded hover:bg-[#393E46] cursor-pointer">
-          <img src={closeImage} className="h-3 w-3" />
+          <button className="h-6 w-8 flex items-center justify-center" onClick={handleClose} >
+            <img src={closeImage} className="h-3 w-3 object-fill" />
+          </button>
         </div>
       </div>
     </>
