@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "npx tsc -b && npx prisma generate",
@@ -15,18 +16,16 @@
     "@prisma/client": "^6.11.1",
     "@types/cors": "^2.8.19",
     "@types/jsonwebtoken": "^9.0.10",
-    "@y/websocket-server": "^0.1.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "ws": "^8.18.3",
-    "y-websocket": "^3.0.0",
-    "y-websocket-server": "^1.0.2",
     "yjs-server": "^0.2.3",
     "zod": "^3.25.74"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
+    "@types/node": "^24.5.2",
     "@types/ws": "^8.18.1",
     "prisma": "^6.11.1",
     "typescript": "^5.8.3"

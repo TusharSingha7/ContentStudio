@@ -2,18 +2,16 @@ import { WebSocket } from "ws";
 import {
   userDetails,
   ChatDetailsSchema,
-  UserDetailsSchema,
-} from "../types/types";
-import client from "../db";
+} from "../types/types.js";
+import client from "../db/index.js";
 import {
   userSocketMap,
-  docsMap,
   userRoomMap,
   roomChatsMap,
   userDetailsMap,
   usersInRoomMap,
   socketUserMap,
-} from "./configs";
+} from "./configs.js";
 
 export function userAddHandler(data: any, ws: WebSocket) {
   console.log("logging from userAddHandler");
@@ -65,7 +63,7 @@ export function userAddHandler(data: any, ws: WebSocket) {
 }
 
 export async function chatHandler(data: any, ws: WebSocket) {
-  console.log("logging from chatHandler");
+  console.log("logging from chatHandler testing");
   const msg = data.data;
   const sender = msg.userDetails;
   const receiver = msg.selectedUser;
@@ -86,8 +84,11 @@ export async function chatHandler(data: any, ws: WebSocket) {
   });
 
   if (userSocketMap.has(receiver.id)) {
+    console.log("receiver connected id : " , receiver.id);
     const socket = userSocketMap.get(receiver.id);
+
     if (socket?.readyState == socket?.OPEN) {
+      console.log("sent to receiver");
       socket?.send(
         JSON.stringify({
           code: 6,
@@ -96,17 +97,24 @@ export async function chatHandler(data: any, ws: WebSocket) {
       );
     }
   }
+  else {
+    console.log("receiver not connected");
+  }
   ws.send(
     JSON.stringify({
       code: 6,
       data: chatR,
     })
   );
-  console.log("logging from chatHandler Finished");
+  console.log("logging from chatHandler Finished testing");
 }
 
 export async function chatListHandler(data: any, ws: WebSocket) {
   console.log("logging from chatListHandler");
+
+  userSocketMap.set(data.data.userDetails.id, ws);
+  socketUserMap.set(ws, data.data.userDetails.id);
+
   const msg = data.data;
   const senderId = msg.userDetails.id;
   const receiverId = msg.selectedUser.id;

@@ -7,27 +7,28 @@ import {
   userDetailsSchema,
   projectDetailsSchema,
   chatDetailsSchema,
-} from "./types/types";
+} from "./types/types.js";
 import jwt from "jsonwebtoken";
-import { authMiddleware, errorHandler } from "./middleware";
+import { authMiddleware, errorHandler } from "./middleware/index.js";
 import cors from "cors";
-import client from "./db";
+import client from "./db/index.js";
 import {
   chatListRequestCode,
   liveChatRequestCode,
   socketUserMap,
   userDetailsAddCode,
   userDetailsRequestCode,
-} from "./utils/configs";
+  userDetailsMap,
+  docsMap,
+} from "./utils/configs.js";
 import {
   chatHandler,
   userAddHandler,
   userExitHandler,
   chatListHandler,
-} from "./utils/wss";
+} from "./utils/wss.js";
 
-import { userDetailsMap, docsMap } from "./utils/configs";
-import { addUserToDoc, removeUserFromDoc } from "./utils/ywss";
+import { addUserToDoc, removeUserFromDoc } from "./utils/ywss.js";
 
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled Rejection:", reason);
@@ -104,7 +105,7 @@ wss.on("connection", (ws: WebSocket) => {
           break;
       }
     });
-    ws.on("close", (code, reason) => {
+    ws.on("close", () => {
       const userId = socketUserMap.get(ws);
       const userD = userDetailsMap.get(userId!);
       console.log("connection closing ", userD);

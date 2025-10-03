@@ -1,7 +1,4 @@
 import z from "zod";
-import * as Y from "yjs";
-import type { Awareness } from "y-protocols/awareness";
-import type { WebSocket } from "ws";
 
 export const projectDetailsSchema = z.object({
   id: z.string().optional(),

@@ -1,6 +1,6 @@
 import { WebSocket } from "ws";
 import * as Y from "yjs";
-import { yjsSocketMap, yjsSocketUserMap, docsMap } from "./configs";
+import { yjsSocketMap, yjsSocketUserMap, docsMap } from "./configs.js";
 
 export function addUserToDoc(ws: WebSocket, roomId: string) {
   if (!docsMap.has(roomId)) {

@@ -1,4 +1,4 @@
-import { userDetails, chat } from "../types/types";
+import { userDetails, chat } from "../types/types.js";
 import WebSocket from "ws";
 
 import type { Doc } from "yjs";
