@@ -7,6 +7,7 @@ import { useState } from "react";
 import { chatSocket, selectedUser } from "@/store";
 import { useRecoilValue } from "recoil";
 import { v4 as uuidv4 } from "uuid";
+import { liveCodeCodes } from "@/lib/liveCode";
 
 export default function ChatControls({
   decode,
@@ -18,18 +19,17 @@ export default function ChatControls({
   const user = useRecoilValue(selectedUser);
 
   const handleSend = () => {
-    console.log("clicked");
     if (text.length > 0 && socket && decode) {
       socket.send(
         JSON.stringify({
-          code: 6,
+          code: liveCodeCodes.chatMessageSend,
           data: {
             userDetails: decode,
             selectedUser: user,
-            message: {
+            message: JSON.stringify({
               type: 1,
               content: text,
-            },
+            }),
           },
         })
       );
@@ -42,14 +42,14 @@ export default function ChatControls({
     if (socket && decode) {
       socket.send(
         JSON.stringify({
-          code: 6,
+          code: liveCodeCodes.chatMessageSend,
           data: {
             userDetails: decode,
             selectedUser: user,
-            message: {
+            message: JSON.stringify({
               type: 0,
               content: sessionId,
-            },
+            }),
           },
         })
       );

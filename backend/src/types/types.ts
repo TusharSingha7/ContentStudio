@@ -34,7 +34,8 @@ export interface userDetails {
   id: number;
   email: string;
   name: string;
-  iat: number;
+  status?: "online" | "offline";
+  iat?: number;
 }
 
 export interface communication {
@@ -43,12 +44,18 @@ export interface communication {
 }
 
 export interface chat {
-  id: number;
+  id: string;
   creatorId: number;
   receiverId: number;
   message: string;
   createdAt: string;
-  seen: string;
+  seen: boolean | null;
+}
+
+export interface ExecuteCodeRequest {
+  language: string;
+  code: string;
+  input?: string;
 }
 
 export type UserDetailsSchema = z.infer<typeof userDetailsSchema>;

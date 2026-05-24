@@ -17,7 +17,12 @@ export const yjsSocketMap = new Map<string, Set<WebSocket>>();
 export const yjsSocketUserMap = new Map<WebSocket, string>();
 
 // message codes
-export const userDetailsAddCode = 1;
-export const chatListRequestCode = 4;
-export const liveChatRequestCode = 6;
-export const userDetailsRequestCode = 1;
+export const liveCodeCodes = {
+  userHandshakeRequest: 100,
+  roomJoin: 101,
+  roomPresenceUpdate: 102,
+  chatHistoryRequest: 200,
+  chatHistoryResponse: 201,
+  chatMessageSend: 202,
+  chatMessageReceive: 203,
+} as const;

@@ -2,13 +2,12 @@ import ChatTopBar from "./chatTopBar";
 import ChatControls from "./chatControls";
 import ChatList from "./chatList";
 import { useRecoilValue } from "recoil";
-import { chatSocket, selectedUser } from "@/store";
+import { selectedUser } from "@/store";
 import DefaultChatInterface from "./defaultChatInterface";
 import { useEffect, useState } from "react";
 import { jwtDecode, type JwtPayload } from "jwt-decode";
 
 export default function ChatInterface() {
-  const socket = useRecoilValue(chatSocket);
   const user = useRecoilValue(selectedUser);
   const [decodedToken, setDecodedToken] = useState<JwtPayload | null>(null);
 
@@ -28,25 +27,6 @@ export default function ChatInterface() {
       console.log("chat interface unomunted");
     };
   }, []);
-
-  useEffect(() => {
-    console.log("chat interface socket use mounted");
-    if (socket && socket.readyState === socket.OPEN && decodedToken) {
-      socket.send(
-        JSON.stringify({
-          code: 4,
-          data: {
-            userDetails: decodedToken,
-            selectedUser: user,
-          },
-        })
-      );
-    }
-
-    return () => {
-      console.log("chat interface socket unmounted");
-    };
-  }, [socket, user, decodedToken]);
 
   return (
     <>

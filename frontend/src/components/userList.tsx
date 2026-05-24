@@ -10,6 +10,7 @@ import { chatList, selectedUser } from "@/store";
 import { useNavigate } from "react-router";
 import { api_url } from "@/config";
 import { ListCache } from "@/cache/singletonClass";
+import { jwtDecode } from "jwt-decode";
 
 export default function UserChatList() {
   const [userList, setUserList] = useState<userDetails[]>(ListCache.getUsersList());
@@ -26,9 +27,8 @@ export default function UserChatList() {
   };
 
   useEffect(() => {
-    console.log("chat list of users mounted");
     async function listFetcher() {
-      if(ListCache.getUsersList().length > 0) {
+      if (ListCache.getUsersList().length > 0) {
         setUserList(ListCache.getUsersList());
         return;
       }
@@ -38,20 +38,20 @@ export default function UserChatList() {
         },
       });
       if (response) {
-        setUserList(response.data.users);
+        const token = localStorage.getItem("token");
+        const currentUserId = token ? jwtDecode<{ id: number }>(token).id : null;
+        const filteredUsers = response.data.users.filter(
+          (user: userDetails) => user.id !== currentUserId
+        );
+        ListCache.setUsersList(filteredUsers);
+        setUserList(filteredUsers);
       }
     }
     listFetcher()
-      .then(() => {
-        console.log("list fetched");
-      })
       .catch((e) => {
         console.log("caught error");
         console.log(e);
       });
-    return () => {
-      console.log("chat list of users unmounted");
-    };
   }, [baseApiUrl]);
   return (
     <>

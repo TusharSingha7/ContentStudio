@@ -1,10 +1,13 @@
-import { chatList, selectedUser } from "@/store";
+import { chatList } from "@/store";
 import { useRecoilValue } from "recoil";
 import { useEffect, useRef } from "react";
-import type { chatDetails } from "@/types";
+import type { chatDetails, userDetails } from "@/types";
 import { Button } from "./ui/button";
 import { useNavigate } from "react-router";
 import { useSetRecoilState } from "recoil";
+import { selectedUser } from "@/store";
+import { jwtDecode } from "jwt-decode";
+import { parseChatMessage } from "@/lib/liveCode";
 
 export default function ChatList() {
   const chattList = useRecoilValue(chatList);
@@ -33,22 +36,33 @@ export default function ChatList() {
 
 function BubbleCompo({ message }: { message: chatDetails }) {
   const user = useRecoilValue(selectedUser);
-  const parsedMessage = JSON.parse(message.message);
+  const currentUser = (() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      return null;
+    }
+
+    try {
+      return jwtDecode<userDetails>(token);
+    } catch {
+      return null;
+    }
+  })();
+  const parsedMessage = parseChatMessage(message.message);
   const content = parsedMessage.content;
   const type = parsedMessage.type;
   const navigate = useNavigate();
   const setUser = useSetRecoilState(selectedUser);
+  const isIncoming = currentUser ? message.creatorId === user.id : false;
 
   return (
     <div
-      className={`flex items-start justify-${
-        user.id == message.creatorId ? "start" : "end"
-      } gap-2.5 my-2`}
+      className={`flex items-start ${isIncoming ? "justify-start" : "justify-end"} gap-2.5 my-2`}
     >
       <div
-        className={`flex flex-col w-full max-w-[320px] leading-1.5 p-4 border-gray-200 bg-[#0D7500] dark:bg-[#0D7500]
+        className={`flex flex-col w-full max-w-[320px] leading-1.5 p-4 border-gray-200 bg-[#0D7500]
                 ${
-                  user.id == message.creatorId
+                  isIncoming
                     ? "rounded-e-xl rounded-es-xl"
                     : "rounded-s-xl rounded-se-xl"
                 }
@@ -78,7 +92,7 @@ function BubbleCompo({ message }: { message: chatDetails }) {
           )}{" "}
         </p>
         <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
-          {JSON.stringify(message.createdAt)}
+          {new Date(message.createdAt).toLocaleString()}
         </span>
       </div>
     </div>

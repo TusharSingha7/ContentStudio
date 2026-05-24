@@ -1,27 +1,21 @@
 import { WebSocket } from "ws";
-import {
-  userDetails,
-  ChatDetailsSchema,
-} from "../types/types.js";
+import { userDetails, ChatDetailsSchema } from "../types/types.js";
 import client from "../db/index.js";
 import {
   userSocketMap,
   userRoomMap,
-  roomChatsMap,
   userDetailsMap,
   usersInRoomMap,
   socketUserMap,
+  liveCodeCodes,
 } from "./configs.js";
 
 export function userAddHandler(data: any, ws: WebSocket) {
-  console.log("logging from userAddHandler");
-
   const userD: userDetails = data.data.userDetails;
   const roomId: string = data.data.roomId;
 
   if (!usersInRoomMap.has(roomId)) {
     usersInRoomMap.set(roomId, new Set<number>());
-    roomChatsMap.set(roomId, []);
   }
 
   userRoomMap.set(userD.id, roomId);
@@ -29,89 +23,79 @@ export function userAddHandler(data: any, ws: WebSocket) {
   userDetailsMap.set(userD.id, userD);
   socketUserMap.set(ws, userD.id);
 
-  console.log(userD);
-
   const listOfUsersInRoom = usersInRoomMap.get(roomId)!;
   if (!listOfUsersInRoom.has(userD.id)) {
     listOfUsersInRoom.add(userD.id);
     usersInRoomMap.set(roomId, listOfUsersInRoom);
   }
-  console.log(listOfUsersInRoom);
-  // creating the set of userDetails
+
   const listOfUserDetails: userDetails[] = [];
   for (const value of listOfUsersInRoom) {
-    const detailsOfUser = userDetailsMap.get(value)!;
-    listOfUserDetails.push(detailsOfUser);
+    const detailsOfUser = userDetailsMap.get(value);
+    if (detailsOfUser) {
+      listOfUserDetails.push({
+        ...detailsOfUser,
+        status: "online",
+      });
+    }
   }
-  console.log("pusihing the lst");
+
   for (const value of listOfUsersInRoom) {
-    const detailsOfUser = userDetailsMap.get(value)!;
-    console.log(detailsOfUser);
-    const socket = userSocketMap.get(detailsOfUser.id);
-    if (socket?.readyState == socket?.OPEN) {
-      console.log("pushed to ", detailsOfUser.id);
-      //send the whole list
-      socket?.send(
+    const socket = userSocketMap.get(value);
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(
         JSON.stringify({
-          code: 2,
+          code: liveCodeCodes.roomPresenceUpdate,
           data: listOfUserDetails,
         })
       );
     }
   }
-  console.log("logging from userAddHandler Finished");
 }
 
 export async function chatHandler(data: any, ws: WebSocket) {
-  console.log("logging from chatHandler testing");
   const msg = data.data;
   const sender = msg.userDetails;
   const receiver = msg.selectedUser;
+  const messageString =
+    typeof msg.message === "string" ? msg.message : JSON.stringify(msg.message);
   const chat: ChatDetailsSchema = {
     creatorId: sender.id,
     receiverId: receiver.id,
-    message: msg.message,
+    message: messageString,
   };
 
-  const str = JSON.stringify(chat.message);
   const chatR = await client.chat.create({
     data: {
       creatorId: chat.creatorId,
       receiverId: chat.receiverId,
-      message: str,
+      message: chat.message,
       seen: false,
     },
   });
 
   if (userSocketMap.has(receiver.id)) {
-    console.log("receiver connected id : " , receiver.id);
     const socket = userSocketMap.get(receiver.id);
 
-    if (socket?.readyState == socket?.OPEN) {
-      console.log("sent to receiver");
-      socket?.send(
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(
         JSON.stringify({
-          code: 6,
+          code: liveCodeCodes.chatMessageReceive,
           data: chatR,
         })
       );
     }
   }
-  else {
-    console.log("receiver not connected");
-  }
+
   ws.send(
     JSON.stringify({
-      code: 6,
+      code: liveCodeCodes.chatMessageReceive,
       data: chatR,
     })
   );
-  console.log("logging from chatHandler Finished testing");
 }
 
 export async function chatListHandler(data: any, ws: WebSocket) {
-  console.log("logging from chatListHandler");
-
   userSocketMap.set(data.data.userDetails.id, ws);
   socketUserMap.set(ws, data.data.userDetails.id);
 
@@ -128,60 +112,54 @@ export async function chatListHandler(data: any, ws: WebSocket) {
   });
   ws.send(
     JSON.stringify({
-      code: 4,
+      code: liveCodeCodes.chatHistoryResponse,
       data: list,
     })
   );
-  console.log("logging from chatlistHander Finished");
 }
 
 export function userExitHandler(ws: WebSocket) {
-  console.log("logging from useExitHandler");
   const clientId = socketUserMap.get(ws);
-  console.log("exiting");
-  console.log(clientId);
   if (!clientId) return;
+
   userDetailsMap.delete(clientId);
+  userSocketMap.delete(clientId);
+  socketUserMap.delete(ws);
+
   const roomId = userRoomMap.get(clientId);
   if (!roomId) return;
+
   userRoomMap.delete(clientId);
-  if (usersInRoomMap.has(roomId)) {
-    usersInRoomMap.get(roomId)?.delete(clientId);
+  const listOfUsersInRoom = usersInRoomMap.get(roomId);
+  if (!listOfUsersInRoom) return;
+
+  listOfUsersInRoom.delete(clientId);
+
+  if (listOfUsersInRoom.size === 0) {
+    usersInRoomMap.delete(roomId);
+    return;
   }
-  if (userSocketMap.has(clientId)) userSocketMap.delete(clientId);
-  socketUserMap.delete(ws);
-  // create an updated list and push to all users
-  const listOfUsersInRoom = usersInRoomMap.get(roomId)!;
+
   const listOfUserDetails: userDetails[] = [];
-
   for (const value of listOfUsersInRoom) {
-    const userD = userDetailsMap.get(value)!;
-
+    const userD = userDetailsMap.get(value);
     if (userD) {
-      listOfUserDetails.push(userD);
+      listOfUserDetails.push({
+        ...userD,
+        status: "online",
+      });
     }
   }
 
   for (const value of listOfUsersInRoom) {
     const socket = userSocketMap.get(value);
-    if (socket && socket.readyState === WebSocket.OPEN) {
-    }
-  }
-
-  for (const value of listOfUsersInRoom) {
-    const detailsOfUser = userDetailsMap.get(value)!;
-    const socket = userSocketMap.get(detailsOfUser.id);
-    if (socket?.readyState == socket?.OPEN) {
-      //send the whole list
-      socket?.send(
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(
         JSON.stringify({
-          code: 2,
+          code: liveCodeCodes.roomPresenceUpdate,
           data: listOfUserDetails,
         })
       );
     }
   }
-
-  console.log("Client disconnected from /live-code");
-  console.log("logging from userExitHandeler Finished");
 }

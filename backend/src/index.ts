@@ -7,17 +7,15 @@ import {
   userDetailsSchema,
   projectDetailsSchema,
   chatDetailsSchema,
+  ExecuteCodeRequest,
 } from "./types/types.js";
 import jwt from "jsonwebtoken";
 import { authMiddleware, errorHandler } from "./middleware/index.js";
 import cors from "cors";
 import client from "./db/index.js";
 import {
-  chatListRequestCode,
-  liveChatRequestCode,
+  liveCodeCodes,
   socketUserMap,
-  userDetailsAddCode,
-  userDetailsRequestCode,
   userDetailsMap,
   docsMap,
 } from "./utils/configs.js";
@@ -39,6 +37,18 @@ process.on("uncaughtException", (err) => {
   process.exit(1);
 });
 
+const pistonLanguageMap: Record<
+  string,
+  { language: string; version: string }
+> = {
+  javascript: { language: "javascript", version: "18.15.0" },
+  typescript: { language: "typescript", version: "5.0.3" },
+  python: { language: "python", version: "3.10.0" },
+  java: { language: "java", version: "15.0.2" },
+  cpp: { language: "c++", version: "10.2.0" },
+  csharp: { language: "csharp", version: "6.12.0" },
+};
+
 const app = express();
 // creaitng a http server
 const server = createServer(app);
@@ -50,11 +60,13 @@ app.use(express.json());
 const yjsWss = new WebSocketServer({ noServer: true });
 
 yjsWss.on("connection", (ws: WebSocket, req) => {
-  const roomId = req.url?.slice(1).split("?")[0] || "default";
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const roomId =
+    url.pathname.replace(/^\/yjs\/?/, "").replace(/^\/+/, "") || "default";
 
   addUserToDoc(ws, roomId);
 
-  const doc = docsMap.get(roomId)!;
+  const doc = docsMap.get(roomId);
   if (!doc) {
     ws.close();
     return;
@@ -78,29 +90,22 @@ const wss = new WebSocketServer({ noServer: true });
 wss.on("connection", (ws: WebSocket) => {
   try {
     const requestUserDetails = {
-      code: userDetailsRequestCode,
+      code: liveCodeCodes.userHandshakeRequest,
       data: {},
     };
     ws.send(JSON.stringify(requestUserDetails));
 
-    console.log("connection to normal websocket established");
-
     ws.on("message", (message) => {
-      console.log("received message on the normal websocket");
-      console.log(message);
-      console.log(typeof message);
       const data = JSON.parse(message.toString());
-      console.log(data);
-      console.log("data is ");
 
       switch (data.code) {
-        case userDetailsAddCode:
+        case liveCodeCodes.roomJoin:
           userAddHandler(data, ws);
           break;
-        case chatListRequestCode:
+        case liveCodeCodes.chatHistoryRequest:
           chatListHandler(data, ws);
           break;
-        case liveChatRequestCode:
+        case liveCodeCodes.chatMessageSend:
           chatHandler(data, ws);
           break;
       }
@@ -202,8 +207,9 @@ app.post("/project", async (req, res) => {
   await client.project.create({
     data: {
       title: parsedProject.data.title,
-      description: parsedProject.data.title,
+      description: parsedProject.data.description,
       userId: parsedProject.data.userId,
+      link: parsedProject.data.link,
     },
   });
   res.status(201).json({ message: "project created" });
@@ -259,6 +265,59 @@ app.post("/chat", async (req, res) => {
     },
   });
   res.status(201).json({ message: "Chat created successfully" });
+});
+
+app.post("/execute", async (req, res, next) => {
+  try {
+    const body = req.body as ExecuteCodeRequest;
+    const code = body.code?.trim();
+    const runtime = pistonLanguageMap[body.language];
+
+    if (!runtime) {
+      res.status(400).json({ error: "Unsupported language" });
+      return;
+    }
+
+    if (!code) {
+      res.status(400).json({ error: "Code is required" });
+      return;
+    }
+
+    const response = await fetch("https://emkc.org/api/v2/piston/execute", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        language: runtime.language,
+        version: runtime.version,
+        files: [
+          {
+            content: body.code,
+          },
+        ],
+        stdin: body.input ?? "",
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      res.status(502).json({
+        error: "Piston execution failed",
+        details: errorText,
+      });
+      return;
+    }
+
+    const result = await response.json();
+    res.status(200).json({
+      language: body.language,
+      run: result.run ?? null,
+      compile: result.compile ?? null,
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/projects", async (req, res) => {

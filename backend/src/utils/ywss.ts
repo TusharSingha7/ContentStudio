@@ -14,11 +14,16 @@ export function addUserToDoc(ws: WebSocket, roomId: string) {
 }
 
 export function removeUserFromDoc(ws: WebSocket, roomId: string) {
-  if (yjsSocketMap.has(roomId)) {
-    if (yjsSocketMap.get(roomId)?.has(ws)) {
-      yjsSocketMap.get(roomId)?.delete(ws);
-    }
+  const sockets = yjsSocketMap.get(roomId);
+  if (sockets?.has(ws)) {
+    sockets.delete(ws);
   }
+
+  if (sockets && sockets.size === 0) {
+    yjsSocketMap.delete(roomId);
+    docsMap.delete(roomId);
+  }
+
   if (yjsSocketUserMap.has(ws)) {
     yjsSocketUserMap.delete(ws);
   }
